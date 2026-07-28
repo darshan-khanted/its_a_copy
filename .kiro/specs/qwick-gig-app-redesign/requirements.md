@@ -245,7 +245,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 9. THE Field Surface SHALL display the claim count on a signal node (§E.3).
 10. IF the number of the doer's active claims has reached the limit granted by their rank THEN THE Claim Flow SHALL refuse the claim and state the limit and the rank that raises it (§D.5).
 11. WHEN an authenticated but identity-unverified doer attempts to claim a gig THEN THE Claim Flow SHALL preserve the gig identifier, one-liner, offered price, and availability response; create no handshake, chat thread, first message, or claim-count increment; and route the doer to identity verification (§E.1, §E.7).
-12. WHEN identity verification for a doer with a preserved claim intent is approved THEN THE Claim Flow SHALL recheck that the gig remains `OPEN`, the doer meets the gig's minimum rank, and the doer's active-claim count remains below the rank allowance; submit the preserved claim only if every check passes; and otherwise retain the preserved intent without creating a handshake, chat thread, first message, or claim-count increment.
+12. WHEN identity verification for a doer with a preserved claim intent is approved THEN THE Claim Flow SHALL recheck that the gig remains `OPEN`, the doer meets the gig's minimum rank, and the doer's active-claim count remains below the rank allowance; SHALL submit the preserved claim only if every check passes; and SHALL otherwise retain the preserved intent without creating a handshake, chat thread, first message, or claim-count increment.
 13. WHILE an identity-verified doer remains rank 01, THE Claim Flow SHALL permit the rank-01 allowance of one active claim.
 
 ### Requirement 12: The Handshake state machine
@@ -318,7 +318,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 8. THE Rep Engine SHALL apply −150 for an upheld report, −80 for a confirmed no-show, and −20 for an abandoned handshake (§D.3).
 9. THE Rep Engine SHALL grant exactly 0 rep for holding a Day Zero Pass (§D.3).
 10. THE Rep Engine SHALL grant rep for a handshake-derived event only when that handshake is SETTLED and the recipient is one of its two distinct participants (§H.4).
-11. THE Rep Engine SHALL provide a recompute-from-ledger operation whose result equals stored current rep and the sum of immediately applied grant-event deltas and release application-event deltas, floored at 0, while excluding every pending grant event; THE App Shell SHALL render every grant and application event to its owner as an auditable receipt line at `/me/rep` (§D.2, §D.8).
+11. THE Rep Engine SHALL provide a recompute-from-ledger operation whose result equals both stored current rep and the sum of immediately applied grant-event deltas and release application-event deltas, floored at 0, while excluding every pending grant event; THE App Shell SHALL render every grant and application event to its owner as an auditable receipt line at `/me/rep` (§D.2, §D.8).
 12. THE Rep Engine SHALL maintain heat as a separately decaying 90-day activity score used only for display and activity surfaces, and SHALL NOT use heat to determine rank (§D.3).
 
 ### Requirement 16: Rep anti-gaming
