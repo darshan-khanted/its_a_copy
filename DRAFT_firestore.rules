@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net - Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && (request.auth.uid == userId || (request.auth.token.email != null && request.auth.token.email.lower() == userId.lower()));
+    }
+
+    // Secure string check helper with size guard
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
+    }
+
+    // Verifies that no entries in the interestedUsers array have isVerified == true on client write
+    function hasNoVerifiedInterestedUsers(interestedList) {
+      return interestedList.size() == 0 || (
+        interestedList[0].get('isVerified', false) == false &&
+        (interestedList.size() <= 1 || (interestedList[1].get('isVerified', false) == false &&
+        (interestedList.size() <= 2 || (interestedList[2].get('isVerified', false) == false &&
+        (interestedList.size() <= 3 || (interestedList[3].get('isVerified', false) == false &&
+        (interestedList.size() <= 4 || (interestedList[4].get('isVerified', false) == false &&
+        (interestedList.size() <= 5 || (interestedList[5].get('isVerified', false) == false &&
+        (interestedList.size() <= 6 || (interestedList[6].get('isVerified', false) == false &&
+        (interestedList.size() <= 7 || (interestedList[7].get('isVerified', false) == false &&
+        (interestedList.size() <= 8 || (interestedList[8].get('isVerified', false) == false &&
+        (interestedList.size() <= 9 || (interestedList[9].get('isVerified', false) == false &&
+        (interestedList.size() <= 10 || (interestedList[10].get('isVerified', false) == false &&
+        (interestedList.size() <= 11 || (interestedList[11].get('isVerified', false) == false &&
+        (interestedList.size() <= 12 || (interestedList[12].get('isVerified', false) == false &&
+        (interestedList.size() <= 13 || (interestedList[13].get('isVerified', false) == false &&
+        (interestedList.size() <= 14 || (interestedList[14].get('isVerified', false) == false &&
+        (interestedList.size() <= 15 || (interestedList[15].get('isVerified', false) == false &&
+        (interestedList.size() <= 16 || (interestedList[16].get('isVerified', false) == false &&
+        (interestedList.size() <= 17 || (interestedList[17].get('isVerified', false) == false &&
+        (interestedList.size() <= 18 || (interestedList[18].get('isVerified', false) == false &&
+        (interestedList.size() <= 19 || (interestedList[19].get('isVerified', false) == false &&
+        interestedList.size() <= 20))))))))))))))))))))))))))))))))))))))));
+    }
+
+    // 2. Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && 
+        isValidId(userId) &&
+        request.resource.data.get('isVerified', false) == false;
+      allow update: if isOwner(userId) && 
+        isValidId(userId) && (
+          request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false) ||
+          request.resource.data.get('isVerified', false) == false
+        );
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+
+    // 3. Gigs Collection
+    match /gigs/{gigId} {
+      allow read: if true;
+      allow create: if isSignedIn() && 
+        isValidId(gigId) &&
+        request.resource.data.get('isVerifiedPoster', false) == false &&
+        hasNoVerifiedInterestedUsers(request.resource.data.get('interestedUsers', []));
+      allow update: if isSignedIn() && 
+        isValidId(gigId) && (
+          request.resource.data.get('isVerifiedPoster', false) == resource.data.get('isVerifiedPoster', false) ||
+          request.resource.data.get('isVerifiedPoster', false) == false
+        ) && hasNoVerifiedInterestedUsers(request.resource.data.get('interestedUsers', []));
+      allow delete: if isSignedIn() && isValidId(gigId);
+
+      // Private subcollection for contact information
+      match /private/contact {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // 4. Reviews Collection
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(reviewId);
+      allow update: if isSignedIn() && isValidId(reviewId);
+      allow delete: if isSignedIn() && isValidId(reviewId);
+    }
+
+    // 5. Chats and Message Subcollections
+    match /chats/{chatId} {
+      allow read, write: if isSignedIn() && isValidId(chatId) && (
+        request.auth.token.email.lower() in resource.data.participants ||
+        (request.resource != null && request.auth.token.email.lower() in request.resource.data.participants)
+      );
+      
+      match /messages/{messageId} {
+        allow read, write: if isSignedIn() && isValidId(messageId) && (
+          request.auth.token.email.lower() in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+        );
+      }
+    }
+
+    // 6. Notifications Collection
+    match /notifications/{notificationId} {
+      allow read, write: if isSignedIn() && isValidId(notificationId) && (
+        (resource == null || resource.data.userEmail == request.auth.token.email) &&
+        (request.resource == null || request.resource.data.userEmail == request.auth.token.email)
+      );
+    }
+
+    // 7. App Feedback Collection
+    match /app_feedback/{feedbackId} {
+      allow read, write: if isSignedIn() && isValidId(feedbackId) && (
+        (resource == null || resource.data.userEmail == request.auth.token.email) &&
+        (request.resource == null || request.resource.data.userEmail == request.auth.token.email)
+      );
+    }
+
+    // 8. Password Resets (Fully Blocked for Clients)
+    match /password_resets/{resetId} {
+      allow read, write: if false;
+    }
+
+    // 9. Activities Logs - System Activity/Trace Logs
+    match /activities_general/{id} { allow write, read: if isSignedIn() && isValidId(id); }
+    match /activities_auth/{id} { allow write, read: if isSignedIn() && isValidId(id); }
+    match /activities_gigs/{id} { allow write, read: if isSignedIn() && isValidId(id); }
+    match /activities_users/{id} { allow write, read: if isSignedIn() && isValidId(id); }
+    match /activities_admin/{id} { allow write, read: if isSignedIn() && isValidId(id); }
+  }
+}

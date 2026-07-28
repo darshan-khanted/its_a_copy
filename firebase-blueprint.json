@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile and manual Aadhaar verification state",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "bio": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "onboardingCompleted": { "type": "boolean" },
+        "aadharUrl": { "type": "string" },
+        "verificationStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "gigsDone": { "type": "number" },
+        "gigsPosted": { "type": "number" }
+      },
+      "required": ["email", "fullName", "isVerified"]
+    },
+    "Gig": {
+      "title": "Gig Posting",
+      "description": "A gig listing posted by a user seeking help",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "posterName": { "type": "string" },
+        "isClosed": { "type": "boolean" },
+        "status": { "type": "string" },
+        "isVerifiedPoster": { "type": "boolean" },
+        "interestedUsers": { "type": "array" }
+      },
+      "required": ["id", "title", "price", "isVerifiedPoster"]
+    },
+    "Contact": {
+      "title": "Contact Details",
+      "description": "Isolated contact information (emails, phone numbers) for gigs",
+      "type": "object",
+      "properties": {
+        "posterPhone": { "type": "string" },
+        "posterEmail": { "type": "string" },
+        "acceptedByPhone": { "type": "string" },
+        "acceptedByEmail": { "type": "string" },
+        "interestedPhones": { "type": "object" }
+      },
+      "required": ["posterEmail"]
+    },
+    "PasswordReset": {
+      "title": "Password Reset",
+      "description": "Secure custom password reset tokens",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "tokenHash": { "type": "string" },
+        "expiresAt": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email", "tokenHash", "expiresAt", "createdAt"]
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User accounts collection. Clients cannot write true to isVerified."
+    },
+    "gigs/{gigId}": {
+      "schema": "Gig",
+      "description": "Active gig listings. Clients cannot write true to isVerifiedPoster."
+    },
+    "gigs/{gigId}/private/contact": {
+      "schema": "Contact",
+      "description": "Isolated contact information (emails, phone numbers) for gigs. Readable only by signed-in users."
+    },
+    "password_resets/{resetId}": {
+      "schema": "PasswordReset",
+      "description": "Secure server-generated password reset tokens. System-only."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Qwick Gig",
+  "description": "A seamless platform for local gig and freelance work matching.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
