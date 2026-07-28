@@ -325,17 +325,23 @@ interface AvatarProps     { user: PublicIdentity; size?: 24|32|48|64|96; showRan
 
 // ---------- the field ----------
 interface SignalNodeProps {
-  signal: FieldSignal;
+  signal: RealFieldSignal | RealFieldCluster;
   active: boolean;
   onPreview: (id: string) => void;
   onOpen: (id: string) => void;
 }
+interface GhostSignalNodeProps {
+  signal: GhostFieldSignal;
+  active: false;
+  onOpen?: never;                          // structurally no detail or claim path
+}
 interface ProximityFieldProps {
   signals: FieldSignal[];
+  waitlistIndicator?: WaitlistDemandIndicator | null;
   anchor: GeoPoint;                     // the hood centre = the "YOU" marker
   radiusM: number;                      // default 2000
-  onPreview?: (s: FieldSignal | null) => void;
-  onOpen?: (s: FieldSignal) => void;
+  onPreview?: (s: RealFieldSignal | RealFieldCluster | null) => void;
+  onOpen?: (s: RealFieldSignal | RealFieldCluster) => void; // ghosts have no open path
   surface: 'paper' | 'night';
 }
 interface DistanceRingsProps { radiiM: number[]; radiusM: number }  // [250,500,1000,2000]
@@ -565,7 +571,7 @@ users/{uid}.repVersion     // monotone counter for optimistic-concurrency + audi
 users/{uid}.heat           // decaying 90-day activity score (display only)
 ```
 
-`rep = Σ repEvents[*].delta`. The denormalised `users/{uid}.rep` is a cache; the ledger is the truth. Any dispute is resolvable by replay, and `POST /api/rep/recompute` (admin) rebuilds from the ledger. Every event carries `idempotencyKey` so a retried write cannot double-grant (§J.7).
+`rep = max(0, Σ immediately-applied grant deltas + Σ release-application deltas)`. The denormalised `users/{uid}.rep` is a cache; the immutable ledger is the truth. Every otherwise eligible grant creates exactly one immutable grant event. If a freeze or rolling velocity cap withholds it, that event is marked pending and contributes **zero** to current rep both before and after release. Release appends exactly one immutable application event referencing the pending event; only that application's delta contributes, exactly once. Any dispute is resolvable by replay, and `POST /api/rep/recompute` (admin) rebuilds from countable events. Grant and application events carry distinct idempotency keys so retries cannot double-grant or double-release (§J.1).
 
 ### D.3 Rep sources and weights
 
@@ -577,7 +583,7 @@ users/{uid}.heat           // decaying 90-day activity score (display only)
 | `REVIEW_GIVEN_FAST` | **+15** | review submitted within 24 h of `DONE`. This is what replaces the punitive locker (§E.6) |
 | `REVIEW_GIVEN` | **+6** | within the 72 h grace window |
 | `RESPONSE_SPEED` | **+0…+10** | `10 × max(0, 1 − medianFirstReplyMins/60)`, recomputed weekly, capped |
-| `IDENTITY_VERIFIED` | **+60** | once, on Aadhaar approval |
+| `IDENTITY_VERIFIED` | **+60** | once, when identity verification is approved; available immediately after account creation and required before the first claim |
 | `PHONE_VERIFIED` | **+15** | once |
 | `HOOD_CLAIMED` | **+10** | once per user, ever — not per hood |
 | `FIRST_FLARE_IN_HOOD` | **+50** | once per pincode **per user**, and only while `hoods/{pin}.gigCount < 10`. Cold-start incentive (§K.4) |
@@ -599,13 +605,13 @@ Two friends can complete 50 fake ₹50 gigs with each other in an afternoon. Eve
 | Attack | Safeguard |
 |---|---|
 | **Collusion ring** (A↔B farming) | **Pairwise diminishing returns**: the *n*-th settled gig between the same two identities is worth `delta × 1/(1 + max(0, n − 2))`. 1st and 2nd full value; 3rd ×⅓; 5th ×⅕. Genuine repeat business (a regular dog-walk) still accrues, farming asymptotes |
-| **Sybil / multi-account** | Rank ≥ 02 requires `IDENTITY_VERIFIED` (Aadhaar). Phone uniqueness is already enforced by query in `handleCompleteOnboarding` — moved server-side to a `phoneIndex/{phoneHash}` doc with a rules-enforced create-once, because a client-side `getDocs` uniqueness check is a race |
+| **Sybil / multi-account** | Rank ≥ 02 requires approved identity verification. Phone uniqueness is already enforced by query in `handleCompleteOnboarding` — moved server-side to a `phoneIndex/{phoneHash}` doc with a rules-enforced create-once, because a client-side `getDocs` uniqueness check is a race |
 | **Distinct-counterparty gate** | Rank 03 requires **≥ 8 distinct verified counterparties**; rank 04 requires ≥ 20. Held in `users/{uid}.counterpartySet` (a server-maintained rolling HyperLogLog-style count, or a simple `Map<uidHash, count>` capped at 200 entries). You cannot buy rank from one friend |
 | **Micro-gig spam** | Rep-eligible gigs need `price ≥ ₹50` **and** `elapsed(agreed → settled) ≥ 8 min`. A ₹10 gig settled in 20 seconds earns ₹0 rep |
 | **Rating inflation** | Reviews are **double-blind** — neither side sees the other's until both submit or 7 days pass. Kills reciprocal-5★ and retaliation. Plus: only one rating per settled handshake, enforced by deterministic review id `${handshakeId}_${reviewerUid}` |
 | **Self-dealing** | `poster.uid !== doer.uid` at rules level; and both must not share a `phoneHash` or a device-install id |
 | **Rep write forgery** | `repEvents` and `users/{uid}.rep` are **server-write-only** in rules. Client `update` on those fields is denied (§G.6). This is the same class of bug the existing `security_spec.md` already identified for `isVerified` — the spec's "Payload 1: Self-Verification Profile Hijack" reasoning applies verbatim to rep |
-| **Velocity abuse** | Rolling caps: `≤ 200 rep/day`, `≤ 700 rep/week` per user. Excess is not lost, it queues (`repEvents.deferredUntil`) — so honest heavy users are delayed, not punished |
+| **Velocity abuse** | Rolling caps: `≤ 200 rep/day`, `≤ 700 rep/week` per user. Each otherwise eligible excess grant is still written once as an immutable pending grant event and excluded from current rep. Pending grants release in original grant-time order when rolling capacity exists; each release appends one immutable application event that references its pending event. Cap-excess remains pending unchanged—never mutated, silently discarded, or forfeited |
 
 ### D.5 The five ranks — thresholds and real unlocks
 
@@ -613,7 +619,7 @@ Names taken exactly from the landing page.
 
 | # | Name | Rep | Extra gate | What it actually unlocks |
 |---|---|---|---|---|
-| **01** | **TAPPED IN** | 0–99 | — | Board + Field access, post a flare, claim a signal, 1 active claim, rep profile |
+| **01** | **TAPPED IN** | 0–99 | — | Browse Board + Field without auth or identity; after auth, post a flare and open rep profile; after identity approval, claim with **1 active claim** allowance |
 | **02** | **HUSTLER** | 100–399 | identity verified | Badge on your card, profile flex (highlight reel of 3 gigs), saved scans, **3 active claims**, post with photo |
 | **03** | **NEIGHBOURHOOD LEGEND** | 400–1199 | ≥ 8 distinct counterparties | **Head start**: high-value signals (≥ ₹500) are visible to you `HEAD_START_MINS = 10` before the wider board · hood leaderboard placement · **5 active claims** · custom field marker colour |
 | **04** | **MAX CHARISMA** | 1200–2999 | ≥ 20 distinct counterparties | *(landing page: `[REDACTED]`)* → **Signal Boost**: pin one of your own flares to the top of the Field for 1 h, once a week · **Trust Vouch**: vouch for a newcomer, transferring 25 of your own rep as stake — returned ×2 if they settle 3 clean gigs, forfeited if they get a report upheld |
@@ -627,7 +633,9 @@ Two mechanisms, both enforced server-side:
 
 **1. Head start (default, applies automatically).** A gig with `price ≥ 500` gets `visibleFrom = { r03: createdAt, all: createdAt + 10min }`. Rank 03+ sees it immediately; everyone else 10 minutes later. On the Field, a rank-03 user sees these nodes wearing a lime `EARLY` tape label with a countdown — visible privilege, which is the point of a status system.
 
-**2. Poster-set rep floor (opt-in).** When flaring, the poster can set `minRank`. Below-floor users see the node as `.redacted` — blurred price, blurred title, and the line `unlocks at NEIGHBOURHOOD LEGEND 👀` — which is *literally the landing page's locked teaser card, rendered from real data*. Rationale: a poster handing over house keys should be able to require a track record. Guardrails: `minRank` capped at 03 (04/05 would strand gigs), and a hood-level cap so at most 25% of a hood's open board can be gated — otherwise the board looks locked to newcomers, which kills the funnel.
+**2. Poster-set rep floor (opt-in).** When flaring, the poster can set `minRank`. Below-floor users see the node as `.redacted` — blurred price, blurred title, and the line `unlocks at NEIGHBOURHOOD LEGEND 👀` — which is *literally the landing page's locked teaser card, rendered from real data*. Rationale: a poster handing over house keys should be able to require a track record. `minRank` is capped at 03 (04/05 would strand gigs).
+
+The hood cap is evaluated before publication from server-authoritative counts: `wouldExceed = (existingRankGatedRealOpenGigs + 1) / (existingRealOpenGigs + 1) > 0.25`, where `rankGated` means an existing real open gig with a poster-selected non-null `minRank` (the automatic 10-minute head-start window does not count). If true, the Compose Flow rejects or disables **only** the rank-floor choice, preserves every entered composer value, explains that at most 25% of the hood's real open board may be rank-gated, and keeps the composer open. It offers public publication only as an explicit alternative; publishing without `minRank` requires the poster's explicit confirmation of public visibility. The system never silently ungates, queues, hides, or auto-publishes the flare.
 
 Enforcement is in **both** places or it is theatre: the Firestore query filters on `visibleFrom`/`minRank` for cheapness, *and* the security rules validate that the requesting user's server-side rank permits the read. Client-side filtering alone would let anyone read the full doc.
 
@@ -642,7 +650,7 @@ stateDiagram-v2
   MAX_CHARISMA --> MYTH : rep >= 3000 AND upheldReports == 0
 
   note right of TAPPED_IN
-    unlock: board, flare, 1 claim
+    unlock after verification: 1 active claim
   end note
   note right of HUSTLER
     unlock: badge, flex, 3 claims, photos
@@ -673,26 +681,44 @@ export interface RepState {
   repVersion: number;             // server-only. increments per applied event
   heat: number;                   // server-only. 90-day decayed activity, display use
   rank: RankId;                   // server-only. derived, denormalised for query+rules
+  verified: boolean;               // server-only approval flag; available for verification from account creation
   distinctCounterparties: number; // server-only
   upheldReports: number;          // server-only
   streakWeeks: number;            // server-only
   medianFirstReplyMins: number | null;
 }
 
-export interface RepEvent {
+export type RepEventRecord = RepGrantEvent | RepApplicationEvent;
+
+export interface RepGrantEvent {
   id: string;
+  eventType: 'GRANT';
   uid: string;
   kind: RepEventKind;
-  delta: number;                  // post-multiplier, as applied
-  rawDelta: number;               // pre-multiplier, for audit
-  multiplier: number;             // pairwise diminishing factor
-  reason: string;                 // human-readable, shown in the rep ledger UI
+  delta: number;                  // post-multiplier grant value; never mutated
+  rawDelta: number;
+  multiplier: number;
+  status: 'APPLIED' | 'PENDING';  // immutable disposition at grant creation
+  pendingReason?: 'REVIEW_FREEZE' | 'DAY_CAP' | 'WEEK_CAP';
+  reason: string;
   handshakeId?: string;
   counterpartyUid?: string;
   hoodId?: string;
-  idempotencyKey: string;         // unique index → no double-grant
+  idempotencyKey: string;         // unique grant key
+  grantOrder: number;             // server sequence for FIFO release
+  resultingRep: number;            // stored result returned on idempotent replay
   createdAt: number;
-  deferredUntil?: number;         // velocity-cap queueing
+}
+
+export interface RepApplicationEvent {
+  id: string;
+  eventType: 'APPLICATION';
+  uid: string;
+  pendingEventId: string;         // references exactly one PENDING grant
+  delta: number;                  // only this delta counts on release
+  idempotencyKey: string;         // derived from pendingEventId; unique
+  resultingRep: number;            // stored result returned on idempotent replay
+  createdAt: number;
 }
 
 export interface Unlocks {
@@ -741,17 +767,28 @@ sequenceDiagram
   U->>A: authenticates
   A->>F: users/{uid} created  · HOOD_CLAIMED +10 · rank TAPPED_IN
   A->>U: DAY ZERO CARD minted — the identity card, immediately
-  U->>A: proceeds to claim (intent preserved)
-  Note over U,S: Aadhaar is asked LATER, at the rank-02 gate, framed as a badge
+  A->>U: identity verification is available immediately (+60 on approval)
+  U->>A: proceeds to claim (gig id + one-liner + offer + availability preserved)
+  alt identity not approved
+    A->>U: verification surface — browse stays available
+    U->>S: submit verification
+    S-->>A: approved
+    A->>A: recheck gig OPEN + min rank + active-claim allowance
+    A->>U: resume claim only if every check passes
+  else identity already approved
+    A->>A: check gig OPEN + min rank + active-claim allowance
+    A->>U: submit claim
+  end
+  Note over U,S: verified rank-01 users may hold one active claim; verification is also one prerequisite for rank 02
 ```
 
 Three specific design moves:
 
-1. **Browse before auth.** The Field is public read for `hoods/{pin}.status == 'live'`. Claiming, flaring and chatting require auth. The current app already has the right machinery for this — the `intendedAction` pattern (`{type:'express_interest'|'negotiate'|'publish_gig'|...}`) with `triggerAuthGate` and `executeRestoreAction` is genuinely good and is **kept and extended**, because intent-preservation across an auth wall is the hardest part and it already works.
+1. **Browse before auth or identity.** The Field, Board, and signal detail are publicly readable for `hoods/{pin}.status == 'live'`. Claiming, flaring, and chatting require auth; claiming additionally requires approved identity verification. The current app's `intendedAction` machinery is kept and extended to preserve the complete claim intent—gig id, human one-liner, offered price, and availability—across both auth and verification. Approval never bypasses eligibility: before resuming, the Claim Flow rechecks that the gig is still `OPEN`, the doer meets `minRank`, and active claims remain below the user's rank allowance. Only then does it atomically submit. A failed recheck retains the intent for correction or retry and creates no handshake, thread, first message, or claim-count increment.
 
 2. **The hood claim is planting a flag, not filling a field.** On successful pincode resolve: the Field animates from a blank paper grid to the hood's street abstraction, the `[data-area]` name types in with `ScrambleText`, the YOU marker drops with a `youpulse` ring expansion, and a toast lands in-voice — `HSR LAYOUT is yours now`. This is exactly the prototype's `applyLocation()` payoff (`toast(\`${location.area} is now on the field\`)`), given weight.
 
-3. **Aadhaar becomes a badge, not paperwork.** Moved out of first-run entirely, to the **rank 02 gate**, where the framing inverts: instead of *"upload your ID to continue"* it is *"you're 40 rep from HUSTLER. one thing left: prove you're real. +60 rep, verified chip, and posters can require it."* Same document, same admin approval path (`verificationStatus: 'pending' → approved`, which the app already implements including the live `onSnapshot` that fires the "Identity Verified successfully ✓" toast). What changes is that it is now a **reward with a stated price**, and the pending state gets its own honest UI (`.redacted` verified chip + `UNDER REVIEW · USUALLY < 24H`) instead of silence.
+3. **Identity verification is available immediately and required only when risk demands it.** Every new account can open `/me/verify` as soon as account creation finishes. Approval grants the verified chip and the one-time `IDENTITY_VERIFIED +60`; verification is mandatory before the first claim and independently satisfies the identity prerequisite for rank 02, but it does not itself promote a user without 100 rep. An unverified user can continue browsing—the trust line remains: **you can browse as a ghost. you can't work as one.** Pending verification renders a `.redacted` verified chip with `UNDER REVIEW · USUALLY < 24H`, and rejection leaves browse/navigation available with a clear retry path.
 
 **Day Zero Pass carry-forward.** The landing page's Pass is the emotional bridge from waitlist to app; dropping it on install would be a broken promise. Design:
 - Waitlist entries (name/pincode/email/phone, position number) are written to `waitlist/{emailHash}` by the landing page.
@@ -778,6 +815,8 @@ Three specific design moves:
 | — | **Smart defaults**: hood prefilled from the claimed hood; date defaults to today with `TODAY / TOMORROW / THIS WEEK` chips; time defaults to the *next* mood window from the day-rhythm data (`the board wakes up` at 17:00) |
 | — | **Urgency as a real state**: `urgent: true` (already in the `Gig` type but barely used) gives the node a magenta pulse and a `NOW` tape label, and costs the poster nothing but a 6-hour expiry — urgency you can't fake indefinitely |
 
+**Rank-floor choice in the composer.** The minimum-rank control is capped at rank 03 and is validated against `(existingRankGatedRealOpenGigs + 1) / (existingRealOpenGigs + 1) > 0.25`. When that predicate is true, only the rank-gating option is rejected/disabled. Title, body, price, location, time, tags, urgency, photo, and all other composer state remain untouched. The UI explains the 25% hood cap and offers `PUBLISH FOR EVERYONE` as a separate action that requires explicit confirmation of public visibility. Cancel returns to the intact composer. No path silently clears `minRank`, queues the flare, hides it, or publishes it automatically.
+
 ### E.3 Discovering and claiming: kill the canned message
 
 **Current failure — the worst copy in the app.** `executeRestoreAction` auto-generates the opening chat message:
@@ -795,7 +834,7 @@ That is a template a bot writes. In a product whose entire differentiator is *"t
 2. **Your number** — pre-filled with the asking price, with `ASKING ₹450` / `−` / `+` steppers in ₹25 increments. Changing it turns the claim into a counter-offer automatically (no separate "negotiate" mode — the current app's `express_interest` vs `negotiate` split is an artificial distinction that produced two nearly identical canned messages).
 3. **Can you make the time?** — `YES, THAT WORKS` / `I'D NEED <time>`.
 
-Submitting creates a **Handshake** (§E.4), not a chat message. The chat thread is created *with the handshake card as its first item* — a structured artefact — and the user's own one-liner as the first human message. The poster's view of candidates becomes scannable: rank chip · rep · their line · their number · distance. Three claims are comparable at a glance, which is impossible today.
+Submitting creates a **Handshake** (§E.4), not a chat message. The chat thread is created *with the handshake card as its first item* — a structured artefact — and the user's own one-liner as the first human message. Before that atomic write, the Claim Flow enforces approved identity, gig `OPEN`, `minRank`, and the rank-based active-claim limit. If auth or identity is missing, it preserves the complete intent (`gigId`, one-liner, offered price, availability), creates none of the handshake artefacts, and resumes only after approval and a fresh eligibility recheck. A verified TAPPED IN user has the rank-01 allowance of one active claim. The poster's view of candidates becomes scannable: rank chip · rep · their line · their number · distance. Three claims are comparable at a glance, which is impossible today.
 
 Poster-side additions: `CLAIMS (3)` count on the signal node itself (social proof that the board is alive), and a `SHORTLIST` action so a poster can chat with two people before agreeing.
 
@@ -914,7 +953,7 @@ Why this is harmful, precisely:
 | 0–24 h | **Prime window.** A lime `.ink-box-lime` card at the top of the feed: `rate <name> · +15 rep · 20 seconds`. `REVIEW_GIVEN_FAST` = **+15** |
 | 24–72 h | Card persists, dismissible, reward drops to `REVIEW_GIVEN` = **+6** |
 | 72 h – 7 d | One notification, in-voice: `"<name> is still waiting on your word"`. Card moves to the profile |
-| > 7 d, 3+ unreviewed | **Rep freeze**: new rep stops accruing until you close a loop. A mono banner states it plainly: `REP FROZEN · 3 LOOPS OPEN · CLOSE ONE TO THAW`. **Navigation is never restricted. Chat is never restricted. The app always works.** |
+| > 7 d, 3+ unreviewed | **Rep freeze**: each otherwise eligible new grant is written once as an immutable pending grant event and excluded from current rep. A mono banner states `REP FROZEN · 3 LOOPS OPEN · CLOSE ONE TO THAW`. Submitting **one** overdue review thaws the freeze. Pending grants then release in original grant-time order, subject to the rolling 200/day and 700/week caps; every released pending grant gets exactly one immutable application event referencing it, and only that application delta counts. Cap-excess remains pending unchanged and is never forfeited. **Navigation, chat, authentication, profile/account management, flaring, claiming, and live-gig coordination remain available under their normal eligibility rules.** |
 
 Plus:
 - **Double-blind release** (§D.4) — mutual reveal or 7-day auto-reveal. Removes retaliation fear, which is the actual reason people skip reviews.
@@ -931,7 +970,7 @@ Plus:
 2. **Contact privacy fix.** `DRAFT_firestore.rules` currently allows `match /gigs/{gigId}/private/contact { allow read, write: if isSignedIn(); }` — any logged-in user reads any poster's phone. Tightened to poster + agreed doer only, with the reveal moment moved into the UI as a designed event (§E.5).
 3. **Public-meetup nudge**, delivered on the promise the landing-page FAQ already makes (*"First meetup? Meet in public. We'll nudge you."*): on the first `AGREED` handshake between two identities, an interstitial suggests three public meeting points near the fuzzed location and offers a one-tap `SHARE MY PLAN` (a WhatsApp/SMS text with gig, name, time, place). Once per pair, never nagged again.
 4. **Report / block / dispute** — absent today, added everywhere: on a signal, a profile, a message, and a handshake. Reports write to `reports/{id}` (server-read-only) and enter a moderation queue. Blocking is bidirectional and filters the Field, the Board and search. Rank 05 users vote in the queue (§D.5) — moderation capacity scales with the community, which is the only affordable answer for a zero-revenue product (§K.5).
-5. **No-anonymity posture, stated in the brand's voice.** Aadhaar-verified identity is required to *claim* (do work) — the highest-risk action — and posting above ₹1000. The FAQ line: *"you can browse as a ghost. you can't work as one."* And the consent copy the landing page already wrote — `BY JOINING YOU AGREE TO BE A DECENT HUMAN` — becomes the actual community-guidelines heading.
+5. **No-anonymity posture, stated in the brand's voice.** Approved identity verification is required before the first claim—the highest-risk action—and is available immediately after account creation. It grants +60 rep when approved and separately satisfies the identity prerequisite for rank 02; it is not an access gate to rank 02 and does not replace the 100-rep threshold. Browsing remains public and available throughout. The FAQ line stays exact: *"you can browse as a ghost. you can't work as one."* The consent copy the landing page already wrote — `BY JOINING YOU AGREE TO BE A DECENT HUMAN` — becomes the actual community-guidelines heading.
 
 ### E.8 Notifications
 
@@ -960,7 +999,8 @@ The current app has `isGigsLoading` / `isReviewsLoading` booleans and essentiall
 | State | Design |
 |---|---|
 | **Loading (Field)** | Paper grid draws in; 6 halftone-shimmer placeholder nodes pulse at low opacity; a mono status line cycles `scanning your hood… / counting the neighbours… / triangulating vibes…`. Skeletons are `.ink-box-sm` with `.halftone` fill and a masked sweep — never a grey rounded rectangle |
-| **Empty hood (ghost town)** | **The cold-start case, and the most important empty state in the product.** Shows the hood's real **waitlist density from the landing page** as *ghost signals* — hollow dashed nodes labelled `WAITING`, not gigs. Honest (never fabricated supply), and the Field still looks alive. Plus a hood progress meter (`31 / 40 NEIGHBOURS · OPENS AT 40`), a `BE FIRST` CTA carrying the `FIRST_FLARE_IN_HOOD +50` bonus, and a `LOOK AT NEARBY HOODS` escape hatch. Copy: `your hood is quiet rn` |
+| **Zero real open gigs** | **The cold-start case.** Only when the hood has `realOpenGigCount === 0`, render deterministic hollow dashed ghost nodes labelled `WAITING`, derived from real waitlist demand. Every ghost has `price: 0` and contributes to no signal count, rupee value, cluster, detail, or claim path. Show the hood progress meter (`31 / 40 NEIGHBOURS · OPENS AT 40`), `BE FIRST` with the eligible `FIRST_FLARE_IN_HOOD +50` bonus, and `LOOK AT NEARBY HOODS`. Copy: `your hood is quiet rn` |
+| **Sparse board (1–4 real open gigs)** | The primary Field renders **only** real gig/cluster nodes and the chrome reports the exact real count and exact real total value. Offer `POST A FLARE` (with the bonus only when the viewer qualifies) and `LOOK AT NEARBY HOODS`. Waitlist demand may appear only outside the node layer as a clearly labelled `WAITLIST` count/progress indicator—never mixed into signal or cluster nodes |
 | **No results after filter** | `nothing at 14:00. the board wakes up around 6.` + a jump-to-17:00 button, driven by the hood's real hourly histogram |
 | **Error** | In-voice, actionable, never apologetic: `firestore ghosted us. retry?` with a retry button and a mono error code for support |
 | **Offline** | Detected via `navigator.onLine` + write failures. Ink banner: `you're offline. showing your last scan.` Last Field snapshot cached in IndexedDB and rendered read-only with a `STALE · 12 MIN AGO` tape label. Composing a flare offline is allowed and queued — the app already has draft persistence (`qwick_draft_gig`), so this is a small extension of an existing pattern |
@@ -1003,7 +1043,7 @@ graph LR
     R17["/me/rep  ·  rep ledger + rank track"]
     R18["/me/flares  ·  my posts"]
     R19["/me/claims  ·  my claims"]
-    R20["/me/verify  ·  Aadhaar as a badge"]
+    R20["/me/verify  ·  identity verification"]
     R21["/alerts"]
     R22["/hood/:pin/leaderboard  ·  rank 03+ unlock"]
   end
@@ -1027,7 +1067,7 @@ Modal routes (rendered over a background location so back closes them): `/auth`,
 | `DETAILS` | **KEPT, rebuilt** | `/g/:gigId`. Now shareable, now the poster's candidate-comparison surface |
 | `PROFILE` | **SPLIT** | `ProfileView.tsx` is **127,019 bytes** — the biggest file in the repo, containing own-profile, editing, my-gigs, reviews, login, logout, and password reset. Split into `/me`, `/me/rep`, `/me/flares`, `/me/claims`, `/me/verify`, and `/u/:handle` |
 | `NOTIFICATIONS` | **KEPT** | `/alerts`, batched, deep-linked |
-| `ONBOARDING` | **DISSOLVED** | Hood claim moves to `/claim` (pre-auth); Aadhaar moves to `/me/verify` behind the rank-02 gate; bio moves to `/me` |
+| `ONBOARDING` | **DISSOLVED** | Hood claim moves to `/claim` (pre-auth); identity verification is available at `/me/verify` immediately after account creation and is required before first claim, while bio moves to `/me` |
 | `MESSAGES` (`InboxView`) | **KEPT** | `/inbox` |
 | `ChatThreadView` (state, not a view) | **PROMOTED** | `/t/:threadId` — a linkable route. The file is 63,677 bytes and splits into thread shell + message list + composer + handshake card |
 | `FEEDBACK` | **REPLACED** | `/loop/:handshakeId` — opt-in, rewarded, never a lock |
@@ -1079,7 +1119,7 @@ graph TB
   subgraph FB["Firebase"]
     AUTH["Auth · email + google"]
     FS["Firestore"]
-    ST["Storage · aadhaar, gig photos"]
+    ST["Storage · identity docs, gig photos"]
   end
 
   subgraph SRV["Express 5 + firebase-admin"]
@@ -1225,7 +1265,7 @@ export interface User extends PublicIdentity, RepState {
 }
 // users/{uid}/private/contact  → { email, phone, phoneHash }
 // users/{uid}/private/payment  → { vpa?: string }        revealed only to an AGREED counterparty
-// users/{uid}/private/kyc      → { aadhaarUrl }          server + admin only
+// users/{uid}/private/kyc      → { identityDocumentUrl? }  server + admin only; document deleted after approval
 // phoneIndex/{phoneHash}       → { uid }                 create-once → real uniqueness (G.6)
 
 // ============ GIG (the signal) ============
@@ -1320,17 +1360,51 @@ export interface Hood {
 }
 
 // ============ FIELD (derived, never persisted) ============
-export interface FieldSignal {
+export interface RealFieldSignal {
+  kind: 'REAL_GIG';
   id: string;
   fx: number; fy: number;                    // field space, [0,1]
   distanceM: number; bearingDeg: number;
   price: number; title: string;
   tone: 'cobalt' | 'magenta' | 'lime' | 'cyan' | 'peach';
   urgent: boolean; ageMins: number;
-  rot: number;                               // deterministic tilt from id
-  locked: boolean;                           // minRank above viewer → render .redacted
-  headStart: boolean;                        // viewer sees it early
+  rot: number;
+  locked: boolean;
+  headStart: boolean;
 }
+
+export interface GhostFieldSignal {
+  kind: 'WAITLIST_GHOST';
+  id: string;
+  fx: number; fy: number;
+  price: 0;
+  title: 'WAITING';
+  claimable: false;
+  detailRoute: null;
+}
+
+export interface RealFieldCluster {
+  kind: 'REAL_GIG_CLUSTER';
+  id: string;
+  gigIds: string[];
+  count: number;
+  totalValue: number;
+  fx: number; fy: number;
+}
+
+export type FieldSignal = RealFieldSignal | RealFieldCluster | GhostFieldSignal;
+
+export interface WaitlistDemandIndicator {
+  label: 'WAITLIST';
+  count: number;
+  progressTarget?: number;
+}
+
+/** Ghost nodes are derived only when realOpenGigs.length === 0. */
+export function deriveFieldContent(
+  realOpenGigs: readonly Gig[],
+  hood: Hood,
+): { nodes: FieldSignal[]; waitlistIndicator: WaitlistDemandIndicator | null };
 ```
 
 **Deleted from the type system:** `ActiveView` (the router replaces it), `Gig.category`, `Gig.distance` (derived, never stored), `Gig.posterPhone` / `posterEmail` / `acceptedByPhone` / `acceptedByEmail` / `acceptedByName` (all move to private subdocs — they exist on the public `Gig` interface today, and `handlePostGig` deletes them at write time, which means the *type* lies about the wire format), `InterestedUser` (replaced by `Handshake`), `Gig.interestedUsers[]` (an unbounded array on a hot doc — every claim rewrites the whole gig document; replaced by a handshakes collection), `ChatProposal` (replaced by `Offer`), the whole `getUserAvatarUrl()` gradient generator.
@@ -1349,7 +1423,7 @@ export interface FieldSignal {
 | `users/{uid}` | public fields | owner (profile fields only) | rep/rank/verified server-only |
 | `users/{uid}/private/*` | owner | owner/server per subdoc | contact, payment, kyc |
 | `phoneIndex/{phoneHash}` | none | create-once | real phone uniqueness |
-| `repEvents/{id}` | owner | **server only** | append-only ledger |
+| `repEvents/{id}` | owner | **server only** | immutable grant and release-application ledger events |
 | `reviews/{handshakeId}_{reviewerUid}` | public after release | author create-once | deterministic id → one review per party |
 | `reports/{id}` | server/mod only | authed create | moderation queue |
 | `waitlist/{emailHash}` | server only | landing page / server | Day Zero matching |
@@ -1399,8 +1473,8 @@ function unchanged(fields) {
 | `POST` | `/api/auth/migrate-legacy-user` | **kept**, sandbox fallback removed |
 | `POST` | `/api/auth/request-password-reset`, `/confirm-password-reset`, `/verify-reset-token` | **kept** |
 | `GET` | `/api/hoods/:pincode` | resolve + cache + adjacency. Wraps `postalpincode.in` with the prototype's `pickPostOffice()`/fallback logic, server-side |
-| `POST` | `/api/gigs` | create flare: fuzz coords, compute geohash, set `visibleFrom`, write private location, `FIRST_FLARE_IN_HOOD` check |
-| `POST` | `/api/handshake` | create/claim (idempotent on `${gigId}_${doerUid}`) |
+| `POST` | `/api/gigs` | create flare: fuzz coords, compute geohash, set `visibleFrom`, write private location, `FIRST_FLARE_IN_HOOD` check; for `minRank`, atomically evaluate `(gatedOpen + 1)/(realOpen + 1) > 0.25` and return `RANK_GATE_CAP` without publishing or changing composer data; a separate explicitly confirmed public request may publish with `minRank: null` |
+| `POST` | `/api/handshake` | create/claim (idempotent on `${gigId}_${doerUid}`); require approved identity, then recheck gig `OPEN`, `minRank`, and active-claim allowance before the atomic handshake/thread/message/count write |
 | `POST` | `/api/handshake/:id/counter` \| `/accept` \| `/decline` \| `/withdraw` \| `/start` \| `/attest-done` \| `/attest-paid` \| `/cancel` \| `/dispute` | the state machine. `/accept` runs the single-winner transaction |
 | `GET` | `/api/gigs/:id/reveal-location` | exact coords + contact, authorised by handshake state |
 | `POST` | `/api/reviews` | create review, hold for double-blind release, grant rep |
@@ -1410,10 +1484,10 @@ function unchanged(fields) {
 | `POST` | `/api/reports` | moderation intake |
 | `POST` | `/api/emails/send-notification`, `/send-welcome` | **kept** (nodemailer) |
 | `POST` | `/api/cron/expire` | expire gigs + stale handshakes (extends existing `/api/cron/check-gigs`) |
-| `POST` | `/api/cron/rep-maintenance` | streaks, heat decay, response-speed recompute, deferred-event release |
+| `POST` | `/api/cron/rep-maintenance` | streaks, heat decay, response-speed recompute, pending-event FIFO release |
 | `POST` | `/api/cron/hood-stats` | price stats, hour histogram, active members |
 | `POST` | `/api/cron/review-release` | 7-day double-blind auto-release |
-| `POST` | `/api/upload` | **kept** (aadhaar + gig photos) |
+| `POST` | `/api/upload` | **kept** (identity documents where the selected verification mechanism requires them, plus gig photos) |
 | ~~`/api/generate-image`~~ | | **removed** unless a real use survives — `@google/genai` is a dependency with no user-facing feature |
 
 `server.ts` at 106,421 bytes splits into `server/routes/*` + `server/services/*`. `requireAuth` middleware verifies the Firebase ID token on every mutating route — the client already has `getClientAuthToken()` and sends `Authorization: Bearer` on some calls, so this standardises an existing pattern.
@@ -1702,17 +1776,26 @@ export interface RepGrantRequest {
   idempotencyKey: string;
 }
 export interface RepGrantResult {
-  applied: boolean;
-  delta: number;
+  applied: boolean;              // true only when this call changed current rep
+  eventId?: string;             // absent only when ineligible
+  disposition: 'APPLIED' | 'PENDING' | 'DUPLICATE' | 'INELIGIBLE';
+  delta: number;                 // 0 when pending; effective delta when applied
+  grantDelta: number;            // immutable eligible grant value
   newRep: number;
   oldRank: RankId;
   newRank: RankId;
   rankChanged: boolean;
-  deferredUntil?: number;
-  reason: 'ok' | 'duplicate' | 'ineligible' | 'velocity-capped';
+  pendingReason?: 'REVIEW_FREEZE' | 'DAY_CAP' | 'WEEK_CAP';
+}
+
+export interface PendingReleaseResult {
+  releasedPendingEventIds: string[];
+  retainedPendingEventIds: string[];
+  newRep: number;
 }
 
 export async function grantRep(req: RepGrantRequest): Promise<RepGrantResult>;
+export async function releasePendingRep(uid: string): Promise<PendingReleaseResult>;
 export function baseDelta(kind: RepEventKind, ratingValue?: number): number;
 export function pairMultiplier(priorCountWithCounterparty: number): number;
 export async function recomputeRepFromLedger(uid: string): Promise<number>;
@@ -1720,16 +1803,20 @@ export async function recomputeRepFromLedger(uid: string): Promise<number>;
 
 **`grantRep` preconditions:** `uid` exists; `idempotencyKey` globally unique per intended grant; if `kind === 'RATING_RECEIVED'` then `ratingValue ∈ [1,5]`; if the kind is handshake-derived then that handshake is `SETTLED` and `uid` is a participant.
 
-**Postconditions:** exactly one `repEvents` doc per distinct `idempotencyKey` — replays return `{applied:false, reason:'duplicate'}` with the *same* `newRep`. `users/{uid}.rep` equals the ledger sum after the call. `repVersion` strictly increases iff `applied`. Non-penalty kinds never decrease rep. Rank is recomputed and any change emits a notification.
+**Postconditions:** exactly one immutable grant event per distinct grant `idempotencyKey`. If immediately eligible for application, that grant event is `APPLIED` and its delta counts once. If a review freeze or rolling cap withholds it, it is `PENDING`, current rep is unchanged, and the event remains excluded forever as a grant record. Replays append nothing and return the same result. `repVersion` strictly increases only for an immediately applied grant or a release application event. Non-penalty applications never decrease rep. Rank is recomputed after each counted delta and any change emits a notification.
 
-**Loop invariants (for `recomputeRepFromLedger`):** after processing the first *k* ledger events in `createdAt` order, `running` equals the sum of their `delta` values; the final `running` equals `users/{uid}.rep`, which is what makes the ledger the auditable source of truth.
+`releasePendingRep` processes pending grant events in ascending `(createdAt, grantOrder, id)` order. For each event that fits the rolling caps it appends exactly one immutable `APPLICATION` event referencing that pending event; only the application delta counts toward rep. A unique reference/idempotency constraint prevents a second application. The pending event is never mutated or deleted. Events that do not fit remain pending unchanged and are never forfeited.
+
+**Loop invariants:** during recomputation, `running` equals the sum of all immediately applied grant deltas plus application-event deltas already visited, floored at zero; pending grant deltas are excluded. During release, every processed pending event has either exactly one application event or remains unchanged pending, and processing order is the original grant order.
 
 ```pascal
 ALGORITHM grantRep(req)
 BEGIN
   // ---- 1. idempotency (before anything else) ----
-  IF EXISTS repEvents WHERE idempotencyKey = req.idempotencyKey THEN
-    RETURN { applied: FALSE, reason: 'duplicate', newRep: currentRep(req.uid) }
+  IF EXISTS repEvents WHERE eventType = 'GRANT'
+     AND idempotencyKey = req.idempotencyKey THEN
+    existing ← loadGrantByKey(req.idempotencyKey)
+    RETURN replayStoredResult(existing)
   END IF
 
   // ---- 2. eligibility ----
@@ -1765,21 +1852,32 @@ BEGIN
   END IF
   delta ← ROUND(raw * mult)
 
-  // ---- 5. velocity cap: defer, never destroy ----
-  today ← repGrantedSince(req.uid, now - 24h)
-  week  ← repGrantedSince(req.uid, now - 7d)
-  IF delta > 0 AND (today + delta > 200 OR week + delta > 700) THEN
-    append repEvents { ...req, delta, rawDelta: raw, multiplier: mult,
-                       deferredUntil: nextWindowStart() }          // NOT summed into rep yet
-    RETURN { applied: FALSE, reason: 'velocity-capped', deferredUntil: nextWindowStart() }
+  // ---- 5. withhold as one immutable pending grant; never destroy ----
+  today ← countablePositiveRepSince(req.uid, now - 24h)
+  week  ← countablePositiveRepSince(req.uid, now - 7d)
+  frozen ← hasOverdueReviewFreeze(req.uid)
+  pendingReason ← NULL
+  IF delta > 0 AND frozen                THEN pendingReason ← 'REVIEW_FREEZE' END IF
+  IF delta > 0 AND today + delta > 200  THEN pendingReason ← 'DAY_CAP' END IF
+  IF delta > 0 AND week + delta > 700   THEN pendingReason ← 'WEEK_CAP' END IF
+
+  IF pendingReason ≠ NULL THEN
+    event ← immutableGrant(req, delta, raw, mult,
+                           status: 'PENDING', pendingReason, grantOrder: nextSequence(req.uid),
+                           resultingRep: currentRep(req.uid))
+    append repEvents event
+    RETURN { applied: FALSE, eventId: event.id, disposition: 'PENDING',
+             delta: 0, grantDelta: delta, newRep: currentRep(req.uid), pendingReason }
   END IF
 
-  // ---- 6. atomic apply ----
+  // ---- 6. atomic immediate apply ----
   TRANSACTION
     u       ← load(users, req.uid)
     oldRank ← u.rank
-    newRep  ← MAX(0, u.rep + delta)                  // rep floors at 0, never negative
-    append repEvents { ...req, delta, rawDelta: raw, multiplier: mult, createdAt: now }
+    newRep  ← MAX(0, countableLedgerDeltaSum(req.uid) + delta)
+    event ← immutableGrant(req, delta, raw, mult,
+                           status: 'APPLIED', grantOrder: nextSequence(req.uid), resultingRep: newRep)
+    append repEvents event
     IF req.counterpartyUid ≠ NULL THEN
       u.distinctCounterparties ← countDistinct(u.counterpartySet ∪ { req.counterpartyUid })
     END IF
@@ -1789,8 +1887,45 @@ BEGIN
   END TRANSACTION
 
   IF newRank ≠ oldRank THEN emitRankChangeNotification(req.uid, oldRank, newRank) END IF
-  ASSERT newRep = SUM(repEvents WHERE uid = req.uid AND deferredUntil = NULL).delta
-  RETURN { applied: TRUE, delta, newRep, oldRank, newRank, rankChanged: newRank ≠ oldRank }
+  ASSERT newRep = MAX(0,
+    SUM(repEvents WHERE uid = req.uid AND eventType = 'GRANT' AND status = 'APPLIED').delta
+    + SUM(repEvents WHERE uid = req.uid AND eventType = 'APPLICATION').delta)
+  RETURN { applied: TRUE, eventId: event.id, disposition: 'APPLIED', delta,
+           grantDelta: delta, newRep, oldRank, newRank, rankChanged: newRank ≠ oldRank }
+END
+
+ALGORITHM releasePendingRep(uid)
+BEGIN
+  ASSERT NOT hasOverdueReviewFreeze(uid)
+  pending ← repEvents WHERE uid = uid AND eventType = 'GRANT' AND status = 'PENDING'
+             AND NOT EXISTS applicationEvent REFERENCING event.id
+             ORDER BY createdAt ASC, grantOrder ASC, id ASC
+
+  released ← [] ; retained ← []
+  FOR EACH p IN pending DO
+    // INVARIANT: every earlier pending grant has exactly one application or remains pending.
+    IF applicationWouldExceedRollingCaps(uid, p.delta) THEN
+      retained.append(p.id)
+      retained.extend(idsOfAllPendingAfter(p))
+      BREAK                                      // strict original grant order
+    END IF
+
+    TRANSACTION
+      IF EXISTS applicationEvent WHERE pendingEventId = p.id THEN CONTINUE END IF
+      u ← load(users, uid)
+      nextRep ← MAX(0, countableLedgerDeltaSum(uid) + p.delta)
+      application ← { eventType: 'APPLICATION', uid, pendingEventId: p.id,
+                      delta: p.delta, idempotencyKey: 'release:' + p.id,
+                      resultingRep: nextRep, createdAt: now }
+      append repEvents application
+      write users/{uid} { rep: nextRep, repVersion: u.repVersion + 1 }
+    END TRANSACTION
+    released.append(p.id)
+  END FOR
+
+  RETURN { releasedPendingEventIds: released,
+           retainedPendingEventIds: retained,
+           newRep: currentRep(uid) }
 END
 ```
 
@@ -1865,6 +2000,46 @@ END
 ```
 
 **Postcondition (unlock consistency, property J.6):** if `isSignalVisibleTo(g, v, t)` is true then it is true for every `t' > t` while `g.state === 'OPEN'` — visibility only ever *opens* over time, never closes. A gig cannot vanish from under a user mid-session.
+
+#### H.5.1 Rank-gated hood-cap decision
+
+```ts
+export interface RankGateCapInput {
+  existingRankGatedRealOpenGigs: number;
+  existingRealOpenGigs: number;
+  requestedMinRank: RankId | null;
+}
+export type RankGateCapDecision =
+  | { allowed: true; resultingRatio: number }
+  | { allowed: false; reason: 'RANK_GATE_CAP'; resultingRatio: number;
+      preserveComposer: true; publicPublishRequiresConfirmation: true };
+
+export function evaluateRankGateCap(input: RankGateCapInput): RankGateCapDecision;
+```
+
+**Preconditions:** both counts are non-negative integers; `existingRankGatedRealOpenGigs <= existingRealOpenGigs`; a non-null requested rank is at most `LEGEND`.
+
+**Postconditions:** a public flare (`requestedMinRank === null`) is unaffected. For a poster-selected rank floor, `resultingRatio = (existingRankGatedRealOpenGigs + 1) / (existingRealOpenGigs + 1)`. The floor is allowed iff that ratio is at most `0.25`. Rejection changes no composer field and creates no gig or queue entry; public publication is a separate, explicitly confirmed request.
+
+```pascal
+ALGORITHM evaluateRankGateCap(input)
+BEGIN
+  IF input.requestedMinRank = NULL THEN
+    RETURN { allowed: TRUE,
+             resultingRatio: input.existingRankGatedRealOpenGigs / MAX(1, input.existingRealOpenGigs) }
+  END IF
+
+  ASSERT index(input.requestedMinRank) <= index('LEGEND')
+  ratio ← (input.existingRankGatedRealOpenGigs + 1) /
+           (input.existingRealOpenGigs + 1)
+
+  IF ratio > 0.25 THEN
+    RETURN { allowed: FALSE, reason: 'RANK_GATE_CAP', resultingRatio: ratio,
+             preserveComposer: TRUE, publicPublishRequiresConfirmation: TRUE }
+  END IF
+  RETURN { allowed: TRUE, resultingRatio: ratio }
+END
+```
 
 ### H.6 The handshake state machine
 
@@ -2028,10 +2203,15 @@ export function mulberry32(seed: number): () => number;   // uniform [0,1)
 export function seededRandom(key: string): () => number;
 export function seededPick<T>(key: string, items: readonly T[]): T;
 export function seededRotation(key: string, maxDeg?: number): number;   // default ±2.2
-export function seededGhostSignals(hoodId: string, count: number): FieldSignal[];
+export function seededGhostSignals(hoodId: string, waitlistCount: number,
+                                   realOpenGigCount: 0): GhostFieldSignal[];
+export function deriveFieldContent(realOpenGigs: readonly Gig[], hood: Hood): {
+  nodes: FieldSignal[];
+  waitlistIndicator: WaitlistDemandIndicator | null;
+};
 ```
 
-**Postconditions:** identical `key` ⇒ identical sequence, on every device, forever. `seededRotation` ∈ `[−maxDeg, maxDeg]`. `seededPick` never returns `undefined` for a non-empty array. `seededGhostSignals` produces signals with `price: 0` and `title: 'WAITING'` — **structurally incapable of being mistaken for a real gig**, which is the safeguard that makes the ghost-town state honest (§E.9, §K.4).
+**Postconditions:** identical `key` ⇒ identical sequence, on every device, forever. `seededRotation` ∈ `[−maxDeg, maxDeg]`. `seededPick` never returns `undefined` for a non-empty array. `deriveFieldContent` calls `seededGhostSignals` **iff** `realOpenGigs.length === 0`. Every ghost has `kind: 'WAITLIST_GHOST'`, `price: 0`, `title: 'WAITING'`, `claimable: false`, and no detail route, and is excluded from real count/value/clustering. When one or more real open gigs exist, `nodes` contains only `REAL_GIG` or derived real-gig cluster nodes; waitlist demand may be returned only as a separate clearly labelled `WAITLIST` indicator.
 
 ### H.9 Reduced-motion-aware animation orchestration
 
@@ -2256,6 +2436,8 @@ Executable properties for property-based testing. **Library: `fast-check`** (Typ
 
 ### J.1 Rep monotonicity and non-forgeability
 
+**Validates: Requirement 15.6**
+
 ```ts
 // P1.1 non-penalty events never decrease rep
 fc.property(fc.uuid(), fc.constantFrom(...NON_PENALTY_KINDS), async (uid, kind) => {
@@ -2263,40 +2445,66 @@ fc.property(fc.uuid(), fc.constantFrom(...NON_PENALTY_KINDS), async (uid, kind) 
   const r = await grantRep({ uid, kind, idempotencyKey: fc.sample(fc.uuid(),1)[0] });
   return r.newRep >= before;
 });
+```
 
-// P1.2 rep always equals the ledger sum (the ledger is the truth)
+**Validates: Requirements 15.3, 15.11**
+
+```ts
+// P1.2 rep always equals only the countable ledger sum
 fc.asyncProperty(fc.array(repGrantRequestArb(), { maxLength: 60 }), async reqs => {
   const uid = 'u_test'; await reset(uid);
   for (const r of reqs) await grantRep({ ...r, uid });
-  const applied = await ledger(uid).filter(e => e.deferredUntil == null);
-  return (await getRep(uid)) === Math.max(0, sum(applied.map(e => e.delta)));
+  const events = await ledger(uid);
+  const countable = events.filter(e =>
+    (e.eventType === 'GRANT' && e.status === 'APPLIED') || e.eventType === 'APPLICATION');
+  return (await getRep(uid)) === Math.max(0, sum(countable.map(e => e.delta)));
 });
+```
 
-// P1.3 idempotency: replaying the same key never changes rep
+**Validates: Requirement 15.4**
+
+```ts
+// P1.3 idempotency: replaying the same grant key never changes rep or appends another event
 fc.asyncProperty(repGrantRequestArb(), fc.integer({min:2,max:8}), async (req, times) => {
   const first = await grantRep(req);
   for (let i=1;i<times;i++) {
     const again = await grantRep(req);
     if (again.applied !== false || again.newRep !== first.newRep) return false;
   }
-  return true;
+  return (await grantEventsByKey(req.idempotencyKey)).length === 1;
 });
+```
 
+**Validates: Requirement 15.2**
+
+```ts
 // P1.4 non-forgeability: no client write path can change rep, rank, or verified
 fc.asyncProperty(fc.uuid(), repFieldArb(), async (uid, patch) =>
   await expectRulesDeny(() => clientUpdate(`users/${uid}`, patch)));
+```
 
+**Validates: Requirement 16.2**
+
+```ts
 // P1.5 collusion resistance: k settlements between the same pair earn strictly less
 //      than k settlements across k distinct counterparties
 fc.property(fc.integer({min:3,max:30}), k =>
   repFromPair(k) < repFromDistinct(k) && repFromPair(k) < repFromPair(k+1) + 1);
+```
 
+**Validates: Requirement 15.11**
+
+```ts
 // P1.6 rep never goes negative
 fc.asyncProperty(fc.array(penaltyRequestArb(), {maxLength:20}), async reqs => {
   for (const r of reqs) await grantRep(r);
   return (await getRep('u_test')) >= 0;
 });
+```
 
+**Validates: Requirements 24.2, 24.4**
+
+```ts
 // P1.7 no fabricated ratings — the migration invariant
 fc.property(fc.nat({max:500}), fc.nat({max:2500}), (count, sum) => {
   fc.pre(count === 0 ? sum === 0 : sum <= 5*count);
@@ -2307,7 +2515,57 @@ fc.property(fc.nat({max:500}), fc.nat({max:2500}), (count, sum) => {
 });
 ```
 
+**Validates: Requirements 15.3, 15.4, 15.11, 16.6, 19.8, 19.9**
+
+```ts
+// P1.8 every withheld grant remains one immutable pending event and releases exactly once
+fc.asyncProperty(fc.array(positiveRepGrantRequestArb(), {minLength:1,maxLength:40}), async reqs => {
+  const uid = 'u_frozen'; await activateReviewFreeze(uid);
+  for (const req of reqs) await grantRep({...req, uid});
+  const before = await pendingGrantSnapshot(uid);
+  if ((await getRep(uid)) !== 0 || before.length !== reqs.length) return false;
+  await submitOneOverdueReview(uid);
+  await releasePendingRep(uid);
+  await releasePendingRep(uid); // replay must not double-apply
+  const after = await pendingGrantSnapshot(uid);
+  const applications = await applicationEvents(uid);
+  return deepEqual(before, after)
+      && applications.every(a => before.some(p => p.id === a.pendingEventId))
+      && new Set(applications.map(a => a.pendingEventId)).size === applications.length
+      && (await getRep(uid)) === sum(applications.map(a => a.delta));
+});
+```
+
+**Validates: Requirements 16.6, 19.9**
+
+```ts
+// P1.9 thaw after one overdue review releases FIFO within caps and retains all excess unchanged
+fc.asyncProperty(pendingGrantListArb(), async pending => {
+  const uid = await seedFrozenLedger(pending);
+  await submitOneOverdueReview(uid);
+  const before = await pendingGrantSnapshot(uid);
+  const result = await releasePendingRep(uid);
+  const releasedOrder = await applicationPendingIdsInCreationOrder(uid);
+  return isPrefixOf(releasedOrder, before.map(e => e.id))
+      && deepEqual(await pendingGrantSnapshot(uid), before)
+      && sameSet(result.retainedPendingEventIds,
+                 before.map(e => e.id).filter(id => !releasedOrder.includes(id)));
+});
+```
+
+**Validates: Requirement 19.10**
+
+```ts
+// P1.10 a rep freeze never changes route, chat, account, flare, claim, or live-gig eligibility
+fc.property(normalEligibilityStateArb(), state => {
+  const frozen = {...state, overdueReviewRepFreeze: true};
+  return deepEqual(appCapabilities(frozen), appCapabilities(state));
+});
+```
+
 ### J.2 Handshake state-machine legality
+
+**Validates: Requirement 12.2**
 
 ```ts
 // P2.1 illegal actions are always rejected and never mutate state
@@ -2316,17 +2574,29 @@ fc.property(handshakeArb(), handshakeActionArb(), fc.nat(), (h, a, now) => {
   if (!LEGAL[h.state].includes(a.type)) return r.ok === false && r.error === 'ILLEGAL_STATE';
   return true;
 });
+```
 
+**Validates: Requirement 12.3**
+
+```ts
 // P2.2 terminal states are absorbing
 fc.property(terminalHandshakeArb(), handshakeActionArb(), fc.nat(),
   (h, a, now) => reduceHandshake(h, a, now).ok === false);
+```
 
+**Validates: Requirement 12.4**
+
+```ts
 // P2.3 no self-accept, ever
 fc.property(negotiatingHandshakeArb(), fc.nat(), (h, now) => {
   const author = h.offers[h.latestSeq].byUid;
   return reduceHandshake(h, {type:'ACCEPT', byUid: author, seq: h.latestSeq}, now).ok === false;
 });
+```
 
+**Validates: Requirement 12.5**
+
+```ts
 // P2.4 stale offers cannot be accepted
 fc.property(negotiatingHandshakeArb(), fc.nat(), fc.nat(), (h, staleSeq, now) => {
   fc.pre(staleSeq !== h.latestSeq);
@@ -2334,7 +2604,11 @@ fc.property(negotiatingHandshakeArb(), fc.nat(), fc.nat(), (h, staleSeq, now) =>
   const r = reduceHandshake(h, {type:'ACCEPT', byUid: other, seq: staleSeq}, now);
   return r.ok === false && r.error === 'STALE_OFFER';
 });
+```
 
+**Validates: Requirement 12.9**
+
+```ts
 // P2.5 NO DOUBLE-ACCEPT: for any interleaving of concurrent accepts on one gig,
 //      exactly one handshake reaches AGREED
 fc.asyncProperty(fc.array(fc.uuid(), {minLength:2, maxLength:12}), fc.scheduler(),
@@ -2346,22 +2620,69 @@ fc.asyncProperty(fc.array(fc.uuid(), {minLength:2, maxLength:12}), fc.scheduler(
     return agreed.length === 1
         && (await gig(gigId)).agreedHandshakeId === agreed[0].id;
   });
+```
 
+**Validates: Requirements 12.7, 12.10**
+
+```ts
 // P2.6 offers are append-only with contiguous seq, and at most one is accepted
 fc.property(fc.array(handshakeActionArb(), {maxLength:40}), actions => {
-  let h = freshHandshake(); 
+  let h = freshHandshake();
   for (const a of actions) { const r = reduceHandshake(h, a, Date.now()); if (r.ok) h = r.next; }
   return h.offers.every((o,i) => o.seq === i)
       && h.offers.filter(o => o.status === 'accepted').length <= 1
       && (h.agreed == null || h.agreed.price === h.offers[h.agreed.agreedOfferSeq].price);
 });
+```
 
+**Validates: Requirement 12.11**
+
+```ts
 // P2.7 SETTLED requires both attestations
 fc.property(reachableHandshakeArb(), h =>
   h.state !== 'SETTLED' || h.wasModeratorResolved || Object.keys(h.attestations.done).length === 2);
 ```
 
+**Validates: Requirements 11.11, 11.13, 17.7, 23.1, 23.4**
+
+```ts
+// P2.8 identity is required before claim, while a verified rank-01 user may hold one active claim
+fc.asyncProperty(claimIntentArb(), async intent => {
+  const uid = await seedUser({rank:'TAPPED_IN', verified:false, activeClaims:0});
+  if (!(await canBrowseField(uid)) || !(await identityVerificationAvailable(uid))) return false;
+  await attemptClaim(uid, intent);
+  if (!deepEqual(await preservedClaimIntent(uid), intent) || await claimArtifactsExist(intent)) return false;
+  await approveIdentity(uid); // +60, but rank remains 01 unless rep independently reaches 100
+  await resumePreservedClaim(uid);
+  return (await user(uid)).verified
+      && (await user(uid)).rank === 'TAPPED_IN'
+      && (await activeClaimCount(uid)) === 1
+      && await atomicClaimArtifactsExistExactlyOnce(intent);
+});
+```
+
+**Validates: Requirement 11.12**
+
+```ts
+// P2.9 preserved claim intent resumes only after every eligibility gate is rechecked
+fc.asyncProperty(claimIntentArb(), claimRecheckStateArb(), async (intent, state) => {
+  const uid = await seedUser({verified:false, rank:state.rank, activeClaims:state.activeClaims});
+  await attemptClaim(uid, intent);
+  await approveIdentity(uid);
+  await setGigEligibility(intent.gigId, {state: state.gigState, minRank: state.minRank});
+  const result = await resumePreservedClaim(uid);
+  const eligible = state.gigState === 'OPEN'
+      && rankIndex(state.rank) >= rankIndex(state.minRank)
+      && state.activeClaims < unlocksFor(state.rank).maxActiveClaims;
+  return deepEqual(await preservedClaimIntent(uid), eligible ? null : intent)
+      && (eligible ? await atomicClaimArtifactsExistExactlyOnce(intent)
+                   : !(await claimArtifactsExist(intent)) && result.submitted === false);
+});
+```
+
 ### J.3 Privacy invariants
+
+**Validates: Requirement 21.4**
 
 ```ts
 // P3.1 public gig docs never carry phone, email, exact coords, or a VPA
@@ -2370,26 +2691,38 @@ fc.asyncProperty(gigDraftArb(), async draft => {
   const pub = await readPublicGig(id);
   const banned = ['posterPhone','posterEmail','acceptedByPhone','acceptedByEmail','lat','lng','vpa'];
   return banned.every(k => !(k in pub))
-      && !JSON.stringify(pub).match(/\b[6-9]\d{9}\b/)          // no bare Indian mobile number
-      && !JSON.stringify(pub).match(/[^\s@]+@[^\s@]+\.[a-z]{2,}/i);  // no email
+      && !JSON.stringify(pub).match(/\b[6-9]\d{9}\b/)
+      && !JSON.stringify(pub).match(/[^\s@]+@[^\s@]+\.[a-z]{2,}/i);
 });
+```
 
+**Validates: Requirement 20.2**
+
+```ts
 // P3.2 fuzz displacement is ALWAYS within [FUZZ_MIN_M, FUZZ_MAX_M] — never zero
 fc.property(indiaGeoPointArb(), fc.uuid(), fc.string({minLength:32}), (exact, gigId, secret) => {
   const d = haversineM(exact, fuzzCoordinate(exact, gigId, secret));
   return d >= FUZZ_MIN_M - 0.5 && d <= FUZZ_MAX_M + 0.5;
 });
+```
 
+**Validates: Requirement 20.3**
+
+```ts
 // P3.3 fuzz is deterministic — repeated reads cannot be averaged to recover the truth
 fc.property(indiaGeoPointArb(), fc.uuid(), fc.string({minLength:32}), fc.integer({min:2,max:50}),
   (exact, gigId, secret, k) => {
     const samples = Array.from({length:k}, () => fuzzCoordinate(exact, gigId, secret));
     const uniq = new Set(samples.map(p => `${p.lat},${p.lng}`));
-    if (uniq.size !== 1) return false;                       // identical every time
+    if (uniq.size !== 1) return false;
     const mean = centroid(samples);
-    return haversineM(exact, mean) >= FUZZ_MIN_M - 0.5;      // averaging gains an attacker nothing
+    return haversineM(exact, mean) >= FUZZ_MIN_M - 0.5;
   });
+```
 
+**Validates: Requirement 21.3**
+
+```ts
 // P3.4 exact location is unreachable before AGREED, and reachable after
 fc.asyncProperty(handshakeLifecycleArb(), async steps => {
   const { gigId, doerUid, states } = await runLifecycle(steps);
@@ -2400,14 +2733,22 @@ fc.asyncProperty(handshakeLifecycleArb(), async steps => {
   }
   return true;
 });
+```
 
+**Validates: Requirement 21.2**
+
+```ts
 // P3.5 a non-participant can never read contact or location, in any state
 fc.asyncProperty(handshakeArb(), fc.uuid(), async (h, stranger) => {
   fc.pre(stranger !== h.posterUid && stranger !== h.doerUid);
   return (await expectRulesDeny(() => readAs(stranger, `gigs/${h.gigId}/private/contact`)))
       && (await expectRulesDeny(() => readAs(stranger, `gigs/${h.gigId}/private/location`)));
 });
+```
 
+**Validates: Requirement 20.6**
+
+```ts
 // P3.6 displayed distance is never more precise than the fuzz radius
 fc.property(fc.nat({max:5000}), m => {
   const shown = parseDistanceWords(formatDistance(m));
@@ -2417,24 +2758,38 @@ fc.property(fc.nat({max:5000}), m => {
 
 ### J.4 Geo ↔ field projection
 
+**Validates: Requirement 3.7**
+
 ```ts
 // P4.1 round-trip within tolerance
 fc.property(fieldTransformArb(), geoWithinRadiusArb(), (t, p) =>
   haversineM(p, unprojectFromField(projectToField(p, t), t)) <= Math.max(1, t.radiusM * 1e-6));
+```
 
+**Validates: Requirement 3.5**
+
+```ts
 // P4.2 output always inside the unit disc — nothing escapes the field
 fc.property(fieldTransformArb(), anyIndiaGeoArb(), (t, p) => {
   const f = projectToField(p, t);
   const r = Math.hypot(f.fx - 0.5, f.fy - 0.5);
   return f.fx >= 0 && f.fx <= 1 && f.fy >= 0 && f.fy <= 1 && r <= 0.5 + 1e-9;
 });
+```
 
+**Validates: Requirement 3.7**
+
+```ts
 // P4.3 the anchor maps exactly to the centre
 fc.property(fieldTransformArb(), t => {
   const f = projectToField(t.anchor, t);
   return Math.abs(f.fx - 0.5) < 1e-12 && Math.abs(f.fy - 0.5) < 1e-12;
 });
+```
 
+**Validates: Requirement 3.6**
+
+```ts
 // P4.4 distance ordering is preserved — THE map must not lie about who is closer
 fc.property(fieldTransformArb(), geoWithinRadiusArb(), geoWithinRadiusArb(), (t, a, b) => {
   const da = haversineM(t.anchor, a), db = haversineM(t.anchor, b);
@@ -2442,19 +2797,29 @@ fc.property(fieldTransformArb(), geoWithinRadiusArb(), geoWithinRadiusArb(), (t,
   const ra = radialDist(projectToField(a,t)), rb = radialDist(projectToField(b,t));
   return (da < db) === (ra < rb + 1e-12);
 });
+```
 
+**Validates: Requirement 3.8**
+
+```ts
 // P4.5 bearing is preserved under both warps
 fc.property(fieldTransformArb(), geoWithinRadiusArb(), (t, p) => {
   fc.pre(haversineM(t.anchor, p) > 5);
   return angleDiffDeg(bearingDeg(t.anchor, p), fieldBearing(projectToField(p, t))) < 0.5;
 });
+```
 
+**Validates: Requirement 3.5**
+
+```ts
 // P4.6 out-of-range points clamp to the boundary, never disappear
 fc.property(fieldTransformArb(), geoBeyondRadiusArb(), (t, p) =>
   Math.abs(radialDist(projectToField(p, t)) - 0.5) < 1e-9);
 ```
 
 ### J.5 Proximity detection determinism
+
+**Validates: Requirement 4.10**
 
 ```ts
 // P5.1 same input ⇒ same output, always (no Map-iteration-order dependence)
@@ -2463,23 +2828,39 @@ fc.property(pointsArb(), pointArb(), fc.integer({min:1,max:400}), (pts, q, maxPx
   const runs = Array.from({length:8}, () => queryNearest(h, q.x, q.y, maxPx));
   return new Set(runs.map(String)).size === 1;
 });
+```
 
+**Validates: Requirement 4.11**
+
+```ts
 // P5.2 the spatial hash agrees with brute force
 fc.property(pointsArb(), pointArb(), fc.integer({min:1,max:400}), (pts, q, maxPx) =>
   queryNearest(buildSpatialHash(pts), q.x, q.y, maxPx) === bruteForceNearest(pts, q, maxPx));
+```
 
+**Validates: Requirement 4.11**
+
+```ts
 // P5.3 never returns anything outside the radius
 fc.property(pointsArb(), pointArb(), fc.integer({min:1,max:400}), (pts, q, maxPx) => {
   const i = queryNearest(buildSpatialHash(pts), q.x, q.y, maxPx);
   return i === null || Math.hypot(pts[i].x-q.x, pts[i].y-q.y) <= maxPx;
 });
+```
 
+**Validates: Requirement 4.10**
+
+```ts
 // P5.4 ties resolve to the lowest index (stable, not arbitrary)
 fc.property(fc.integer({min:2,max:8}), n => {
   const pts = Array.from({length:n}, () => ({x:100,y:100}));
   return queryNearest(buildSpatialHash(pts), 100, 100, 50) === 0;
 });
+```
 
+**Validates: Requirement 4.7**
+
+```ts
 // P5.5 at most one onActiveChange per animation frame
 fc.asyncProperty(fc.array(pointerEventArb(), {minLength:1,maxLength:200}), async events => {
   const calls = await replayInOneFrame(events);
@@ -2489,13 +2870,19 @@ fc.asyncProperty(fc.array(pointerEventArb(), {minLength:1,maxLength:200}), async
 
 ### J.6 Rank thresholds and unlock consistency
 
+**Validates: Requirement 17.3**
+
 ```ts
 // P6.1 rank is monotone in rep
 fc.property(repStateArb(), fc.nat({max:20000}), fc.nat({max:20000}), (st, r1, r2) => {
   const [lo, hi] = r1 <= r2 ? [r1, r2] : [r2, r1];
   return rankIndex(evaluateRank(lo, st)) <= rankIndex(evaluateRank(hi, st));
 });
+```
 
+**Validates: Requirement 17.4**
+
+```ts
 // P6.2 gates are never bypassed
 fc.property(fc.nat({max:100000}), repStateArb(), (rep, st) => {
   const d = def(evaluateRank(rep, st));
@@ -2503,7 +2890,11 @@ fc.property(fc.nat({max:100000}), repStateArb(), (rep, st) => {
       && (!d.requiresVerified || st.verified)
       && st.distinctCounterparties >= d.minDistinctCounterparties;
 });
+```
 
+**Validates: Requirement 17.8**
+
+```ts
 // P6.3 unlocks are monotone: a higher rank never has fewer capabilities
 fc.property(fc.constantFrom(...RANK_IDS), fc.constantFrom(...RANK_IDS), (a, b) => {
   fc.pre(rankIndex(a) <= rankIndex(b));
@@ -2512,13 +2903,21 @@ fc.property(fc.constantFrom(...RANK_IDS), fc.constantFrom(...RANK_IDS), (a, b) =
       && ub.headStartMins   >= ua.headStartMins
       && BOOL_UNLOCKS.every(k => !ua[k] || ub[k]);
 });
+```
 
+**Validates: Requirement 18.7**
+
+```ts
 // P6.4 visibility only ever opens over time
 fc.property(openGigArb(), repStateOrNullArb(), fc.nat(), fc.nat(), (g, v, t1, dt) => {
   const t2 = t1 + dt;
   return !isSignalVisibleTo(g, v, t1) || isSignalVisibleTo(g, v, t2);
 });
+```
 
+**Validates: Requirement 18.8**
+
+```ts
 // P6.5 head start is real: LEGEND+ sees a gated gig strictly before everyone else
 fc.property(highValueGigArb(), (g) => {
   const legend = { ...baseState, rank: 'LEGEND' as RankId };
@@ -2526,7 +2925,11 @@ fc.property(highValueGigArb(), (g) => {
   const t = g.visibleFrom.legend;
   return isSignalVisibleTo(g, legend, t) && !isSignalVisibleTo(g, rookie, t);
 });
+```
 
+**Validates: Requirement 17.5**
+
+```ts
 // P6.6 hysteresis prevents oscillation
 fc.property(fc.constantFrom(...RANK_IDS), fc.integer({min:0,max:74}), (r, drop) => {
   const d = def(r);
@@ -2535,7 +2938,25 @@ fc.property(fc.constantFrom(...RANK_IDS), fc.integer({min:0,max:74}), (r, drop) 
 });
 ```
 
+**Validates: Requirements 18.5, 18.9, 18.10**
+
+```ts
+// P6.7 a cap breach rejects only rank gating and never silently ungates or publishes
+fc.asyncProperty(composerStateArb(), hoodOpenCountsArb(), async (draft, counts) => {
+  fc.pre((counts.rankGated + 1) / (counts.realOpen + 1) > 0.25);
+  const before = structuredClone(draft);
+  const result = await attemptRankGatedPublish(draft, counts);
+  return result.error === 'RANK_GATE_CAP'
+      && deepEqual(result.composerState, before)
+      && result.publishedGigId == null
+      && result.queued === false
+      && result.publicAlternative.requiresExplicitConfirmation === true;
+});
+```
+
 ### J.7 Notification idempotency
+
+**Validates: Requirement 26.2**
 
 ```ts
 // P7.1 the same logical event never produces two notifications
@@ -2543,18 +2964,30 @@ fc.asyncProperty(notificationEventArb(), fc.integer({min:2,max:10}), async (ev, 
   for (let i=0;i<times;i++) await emitNotification(ev);
   return (await notificationsMatching(ev)).length === 1;
 });
+```
 
+**Validates: Requirement 26.1**
+
+```ts
 // P7.2 ids are deterministic — no Math.random
 fc.property(notificationEventArb(), ev =>
   notificationId(ev) === notificationId(ev)
   && notificationId(ev) === `${ev.kind}_${ev.subjectId}_${ev.uid}`);
+```
 
+**Validates: Requirement 26.4**
+
+```ts
 // P7.3 push cadence: never more than 1 push per 15 min per user
 fc.asyncProperty(fc.array(notificationEventArb(), {maxLength:80}), async evs => {
   const sent = await runNotificationPipeline(evs);
   return sent.every((s,i) => i === 0 || s.at - sent[i-1].at >= 15*60*1000);
 });
+```
 
+**Validates: Requirement 26.5**
+
+```ts
 // P7.4 quiet hours honoured except for an active handshake
 fc.asyncProperty(notificationEventArb(), quietHourArb(), async (ev, hour) => {
   const sent = await runNotificationPipeline([{...ev, at: hour}]);
@@ -2566,24 +2999,34 @@ fc.asyncProperty(notificationEventArb(), quietHourArb(), async (ev, hour) => {
 
 The brand's central claim, as an executable invariant.
 
+**Validates: Requirement 13.5**
+
 ```ts
 // P8.1 no server route ever accepts, holds, or forwards an amount
 fc.property(fc.constantFrom(...ALL_SERVER_ROUTES), route => {
   const h = handlerSource(route);
   return !/razorpay|stripe|payu|cashfree|paytm|createOrder|captureP|payout|escrow|wallet|settlement/i.test(h);
 });
+```
 
+**Validates: Requirements 13.3, 13.4**
+
+```ts
 // P8.2 the UPI intent is a client-side deep link only, addressed to the DOER
 fc.property(agreedHandshakeArb(), h => {
   const uri = buildUpiIntent(h);
   const pa = new URL(uri).searchParams.get('pa');
   return uri.startsWith('upi://pay?')
       && pa === doerVpa(h)
-      && pa !== PLATFORM_VPA                                  // never us
+      && pa !== PLATFORM_VPA
       && !/qwick|platform|merchant/i.test(pa ?? '')
       && Number(new URL(uri).searchParams.get('am')) === h.agreed.price;
 });
+```
 
+**Validates: Requirement 13.2**
+
+```ts
 // P8.3 the receipt always shows exactly ₹0 platform take, and in = out
 fc.property(agreedHandshakeArb(), h => {
   const r = buildReceipt(h);
@@ -2592,7 +3035,11 @@ fc.property(agreedHandshakeArb(), h => {
       && r.doerReceives === h.agreed.price
       && r.posterPays === r.doerReceives;
 });
+```
 
+**Validates: Requirement 13.6**
+
+```ts
 // P8.4 payment attestation changes no balance anywhere — it is a record
 fc.asyncProperty(agreedHandshakeArb(), async h => {
   const before = await snapshotAllBalanceLikeFields();
@@ -2601,7 +3048,9 @@ fc.asyncProperty(agreedHandshakeArb(), async h => {
 });
 ```
 
-### J.9 Motion and reduced motion
+### J.9 Motion, reduced motion, and deterministic field decoration
+
+**Validates: Requirement 27.13**
 
 ```ts
 // P9.1 reduced motion changes timing, never outcomes
@@ -2610,13 +3059,21 @@ fc.asyncProperty(beatListArb(), async beats => {
   const b = await runOrchestrator(beats, { reduced: true  });
   return deepEqual(a.effectsInOrder, b.effectsInOrder);
 });
+```
 
+**Validates: Requirement 28.11**
+
+```ts
 // P9.2 the texture budget never enables what reduced motion forbids
 fc.property(deviceProfileArb(), p => {
   const b = textureBudget(p);
   return !p.reducedMotion || (!b.radar && !b.marquee && !b.nodePulse);
 });
+```
 
+**Validates: Requirement 1.4**
+
+```ts
 // P9.3 deterministic tilt: a card's rotation is stable across renders and within bounds
 fc.property(fc.string({minLength:1}), fc.double({min:0.1,max:10,noNaN:true}), (key, max) => {
   const r1 = seededRotation(key, max), r2 = seededRotation(key, max);
@@ -2624,7 +3081,28 @@ fc.property(fc.string({minLength:1}), fc.double({min:0.1,max:10,noNaN:true}), (k
 });
 ```
 
+**Validates: Requirements 9.1, 9.2, 9.8, 9.9, 9.10**
+
+```ts
+// P9.4 ghosts exist only at zero real gigs and never mix with real nodes or metrics
+fc.property(fc.array(realOpenGigArb(), {maxLength:20}), hoodArb(), (gigs, hood) => {
+  const content = deriveFieldContent(gigs, hood);
+  const ghosts = content.nodes.filter(n => n.kind === 'WAITLIST_GHOST');
+  if (gigs.length === 0) {
+    return content.nodes.every(n => n.kind === 'WAITLIST_GHOST')
+        && ghosts.every(g => g.price === 0 && !g.claimable && g.detailRoute === null);
+  }
+  return ghosts.length === 0
+      && content.nodes.every(n => n.kind === 'REAL_GIG' || n.kind === 'REAL_GIG_CLUSTER')
+      && fieldRealCount(content) === gigs.length
+      && fieldRealValue(content) === sum(gigs.map(g => g.askPrice))
+      && (content.waitlistIndicator == null || content.waitlistIndicator.label === 'WAITLIST');
+});
+```
+
 ### J.10 Day-rhythm aggregation
+
+**Validates: Requirement 6.4**
 
 ```ts
 // P10.1 exactly 16 ascending buckets, hours 8..23
@@ -2632,19 +3110,31 @@ fc.property(fc.array(gigForBucketArb(), {maxLength:400}), gigs => {
   const b = bucketByHour(gigs, 'history');
   return b.length === 16 && b.every((x,i) => x.hour === 8 + i);
 });
+```
 
+**Validates: Requirement 6.5**
+
+```ts
 // P10.2 FLEXIBLE gigs are excluded, never invented into an hour
 fc.property(fc.array(gigForBucketArb(), {maxLength:400}), gigs => {
   const dated = gigs.filter(g => g.startHour !== null && g.startHour >= 8);
   return sum(bucketByHour(gigs,'history').map(b => b.count)) === dated.length;
 });
+```
 
+**Validates: Requirement 6.7**
+
+```ts
 // P10.3 heat is normalised to [0,1] with a peak of exactly 1
 fc.property(fc.array(gigForBucketArb(), {minLength:1,maxLength:400}), gigs => {
   const h = boardHeat(bucketByHour(gigs,'history'));
   return h.every(v => v >= 0 && v <= 1) && (Math.max(...h) === 0 || Math.max(...h) === 1);
 });
+```
 
+**Validates: Requirement 6.6**
+
+```ts
 // P10.4 thin history is never rendered as a chart
 fc.property(fc.array(gigForBucketArb(), {maxLength:19}), gigs =>
   hasEnoughHistory(bucketByHour(gigs,'history')) === false);
@@ -2659,7 +3149,7 @@ fc.property(fc.array(gigForBucketArb(), {maxLength:19}), gigs =>
 
 | Risk | Severity | Honest assessment | Mitigation |
 |---|---|---|---|
-| **Cold start / liquidity** | **Critical** | A hyperlocal board with 4 gigs is worthless, and no amount of design fixes an empty market. This is the risk that kills the product, not the UI | Pincode-by-pincode launch with a hard gate (`hoods/{pin}.status`) — never open a hood below ~40 waitlist members on both sides. Ghost signals from real waitlist data (§E.9). `FIRST_FLARE_IN_HOOD +50`. Adjacent-hood spillover. And the design must make a 4-signal Field look *deliberate*, not broken — the radar metaphor helps here: a radar with 4 blips is still a working radar, whereas a list with 4 rows looks dead |
+| **Cold start / liquidity** | **Critical** | A hyperlocal board with 4 gigs is thin, and no amount of design invents supply. This is the risk that kills the product, not the UI | Pincode-by-pincode launch with a hard gate (`hoods/{pin}.status`). Ghost nodes from real waitlist data appear only at zero real open gigs (§E.9); sparse boards show their exact real count/value with flare and nearby-hood actions, while waitlist demand stays a separate labelled indicator. `FIRST_FLARE_IN_HOOD +50`. Adjacent-hood spillover |
 | **Moderation load with zero revenue** | **High** | No commission means no budget for a trust & safety team, and "post literally anything" is an unbounded input surface. Aadhaar reduces anonymity but does not stop harm | Rank-05 Hood Council (§D.5) — community moderation is the only affordable model. Server-side classifier on flare text for a hard-block list. Rate limits. Report from every surface. **Open question: what is the escalation path for something genuinely serious?** That needs a real answer before launch, and it is a policy answer, not a design one |
 | **No escrow ⇒ no recourse** | **High** | The ₹0 claim is the brand, and it structurally means we cannot reverse a non-payment. A doer who gets stiffed has only the rep system | Two-sided attestation, `NO_SHOW_CONFIRMED −80`, dispute flow, and public rep. Design the *disclosure* honestly rather than hiding it: the receipt itself says `NO WALLET · NO WITHDRAWAL DELAY`, which is the same fact stated as a benefit. **Trade-off accepted deliberately** — adding escrow would mean holding money, which would mean commission, which would destroy the entire positioning |
 | **Aadhaar handling** | **High** | The app currently uploads Aadhaar images via `uploadFileWithFallback` and stores a URL on the user doc (`aadharUrl`). Storing government ID images is a serious liability, and India's DPDP Act applies | Move to `users/{uid}/private/kyc`, Storage rules deny all client reads, admin-only access, **delete the image after approval and keep only a boolean + timestamp + last-4 hash**. Long-term: migrate to a DigiLocker / Aadhaar-offline-XML verification flow so we never hold the image at all. This is the single biggest legal exposure in the codebase |
@@ -2689,7 +3179,7 @@ These are real conflicts. Each gets a decision, not a hand-wave.
 1. **No real basemap on the primary browse surface.** Costs absolute street context, buys total visual authorship, real privacy, ₹0 map spend and 90 KB. Mitigated by the precision layer where it matters (§C.1).
 2. **Rep is server-authoritative.** Costs an Express round trip and some latency on the "you levelled up" moment. Buys a progression system that is not a lie. Non-negotiable.
 3. **No escrow.** Costs recourse. Buys the entire brand position.
-4. **Aadhaar required to do work.** Costs top-of-funnel conversion on the supply side. Buys the trust floor a no-escrow product needs. Browse and post stay lighter-weight.
+4. **Identity verification required before the first claim.** Costs conversion on the supply side, but users can start verification immediately after account creation and keep browsing while it is pending. Approval grants +60 and independently satisfies the rank-02 identity prerequisite; verified rank-01 users retain one active claim. Buys the trust floor a no-escrow product needs.
 5. **Handshake-per-pair instead of `interestedUsers[]`.** Costs one more collection and a slightly more complex query. Buys per-claim security rules, offer history, no unbounded array on a hot document, and the deletion of the 20-level nested rules helper (§G.6).
 6. **`react-router-dom` added.** A dependency, ~11 KB gzip. Buys deep links, shareable gigs, correct back-button behaviour, modal-as-route, and analytics. The current `activeView` machine cannot deliver any of those at any price.
 7. **Freeform tags, no categories.** Costs structured filtering. Buys brand coherence — `categories: 0` is printed on the landing page's receipt.
@@ -2698,19 +3188,20 @@ These are real conflicts. Each gets a decision, not a hand-wave.
 
 The empty-hood case is the most likely first impression for most early users, so it gets first-class design rather than an afterthought:
 
-1. **Never fabricate supply.** The prototype hash-generates fake gigs; that is correct for a landing page and *fraud* in an app. `seededGhostSignals` (§H.8) emits `price: 0, title: 'WAITING'` and renders as hollow dashed nodes — structurally unmistakable for a gig (property-guaranteed).
-2. **Show demand instead.** Waitlist entries carry pincodes. A pre-launch hood's Field shows *people waiting*, which is honest, is genuinely encouraging, and makes the surface look alive with real data.
-3. **Progress, not emptiness.** `31 / 40 NEIGHBOURS · HSR LAYOUT OPENS AT 40` with a `PULL 3 FRIENDS IN` share action. An empty board becomes a collective goal.
-4. **Reward the first mover.** `FIRST_FLARE_IN_HOOD +50` while `gigCount < 10`, surfaced directly in the empty state.
-5. **Adjacent spillover.** `LOOK AT NEARBY HOODS` widens to `hood.adjacent`, clearly labelled as further away.
-6. **Seed demand manually.** Not a design feature but an operational necessity: the team should post real errands in each launch hood for the first two weeks. Worth stating because the design must accommodate it honestly — team-posted gigs carry a `QG TEAM` marker, not a fake user account.
+1. **Never fabricate supply.** The prototype hash-generates fake gigs; that is correct for a landing page and *fraud* in an app. When and only when `realOpenGigCount === 0`, `seededGhostSignals` (§H.8) emits `WAITLIST_GHOST` records with `price: 0`, `title: 'WAITING'`, `claimable: false`, and no detail route. They render as hollow dashed nodes and contribute to no real gig count, total value, cluster, detail, or claim path.
+2. **Never mix ghosts with supply.** At `realOpenGigCount >= 1`, the primary Field node layer contains only real gig and real-gig cluster nodes. Waitlist demand may appear only as a separate, clearly labelled `WAITLIST` count/progress indicator outside that layer.
+3. **Make sparse boards exact and actionable.** For one to four real open gigs, chrome displays the exact real count and summed real value, plus `POST A FLARE` and `LOOK AT NEARBY HOODS`. The first-flare bonus appears only if the viewer is actually eligible.
+4. **Progress, not emptiness.** In the zero-real-gig state, `31 / 40 NEIGHBOURS · HSR LAYOUT OPENS AT 40` with a `PULL 3 FRIENDS IN` share action turns an empty board into a collective goal.
+5. **Reward the first mover.** Surface `FIRST_FLARE_IN_HOOD +50` in zero and sparse states only while the viewer and hood satisfy the actual eligibility rule.
+6. **Adjacent spillover.** `LOOK AT NEARBY HOODS` widens to `hood.adjacent`, clearly labelled as further away.
+7. **Seed demand manually.** Not a design feature but an operational necessity: the team should post real errands in each launch hood for the first two weeks. Team-posted gigs carry a `QG TEAM` marker, not a fake user account.
 
 ### K.5 Open questions
 
 1. **Rep calibration.** All numbers in §D.3 are first-pass. What does the distribution look like after hood #1? Specifically: does +40 per settled gig put a genuine hustler at LEGEND in two weeks (too fast) or two months (about right)?
 2. **What exactly is behind `[REDACTED]`?** §D.5 proposes Signal Boost + Trust Vouch. The landing page deliberately did not commit, so this is still a product decision. Trust Vouch in particular is a novel mechanic with real abuse surface — is staking your own rep on a stranger a good idea, or a social-pressure trap?
 3. **Age policy.** The prototype validates `Number(value) < 16 → 'QWICK GIG IS 16+'`. Minors doing paid tasks for strangers raises real legal and safety questions in India. Is 16+ actually the policy, or should it be 18+ for doers and 16+ for posters?
-4. **Aadhaar vs alternatives.** Is holding Aadhaar images acceptable at all, even transiently? DigiLocker/offline-XML avoids it entirely and is a stronger verification. Higher build cost, much lower liability. Recommendation: do this in Phase 3, not "later".
+4. **Identity-verification implementation mechanism.** Timing and access policy are settled: available immediately after account creation, mandatory before first claim, +60 on approval, and independently required for rank 02. The open implementation choice is document upload versus DigiLocker/offline XML. Recommendation: move to DigiLocker/offline XML in Phase 3 to avoid retaining identity images.
 5. **Which side gets the head start?** §D.6 gives rank 03+ a 10-minute early look. That advantages incumbents and may make it harder for new users to get their first gig — the exact opposite of what a cold-start product needs. Consider inverting it for a user's *first two* gigs (a "rookie window") so the ladder has a bottom rung.
 6. **Language.** The voice is English-with-Hindi-inflection. Does the product need Hindi, Kannada, Tamil, Bengali UI? For "teach my dad to use UPI without rage", the *dad* may be the one reading the screen. This has font-subsetting consequences (§I.4) and should be decided before self-hosted subsets are cut.
 7. **Does the Board survive?** If Field usage dominates after launch, the Board becomes maintenance cost. Instrument both from day one and be willing to demote it to an accessibility-and-search surface.
@@ -2736,9 +3227,9 @@ Each phase is independently shippable. Phase 1 alone delivers a visibly transfor
 |---|---|---|
 | **0 · Unbreak** | Deploy hardened rules + indexes. Fix the directory structure and every import. Delete the positional CSS. Remove the three hostname auth bypasses. Split `server.ts`. | The repo cannot build and the database is world-writable. Nothing else matters until this is done |
 | **1 · Skin + Field** | Design tokens, `ink.css`, the `components/ink/` primitives, `react-router-dom`, hood claim + `hoods/{pincode}`, the Field with real data, Field ⇄ Board, all empty/loading states, the voice module | This is the phase Darshan feels. Palette, type, tactility and the map, on real data |
-| **2 · Handshake** | `handshakes` collection, the state machine, claim ritual, offer/counter UI, LIVE runner, the receipt + UPI intent, two-sided attestation, migration of `interestedUsers[]` | Makes the core loop correct and kills the canned message |
+| **2 · Handshake** | Identity-verification entry and first-claim gate, complete intent preservation/resume, `handshakes` collection, the state machine, claim ritual, offer/counter UI, LIVE runner, the receipt + UPI intent, two-sided attestation, migration of `interestedUsers[]` | Makes the core loop correct, enforces the trust line, and kills the canned message |
 | **3 · Rep** | Rep ledger + engine, ranks, unlocks, head start, `/me/rep`, the rank-up reveal, Day Zero Pass carry-forward, rating de-fabrication migration | Delivers the landing page's headline promise |
-| **4 · Trust** | Location fuzzing migration, contact reveal gating, report/block/dispute, meetup nudge, moderation queue, Hood Council, Aadhaar → DigiLocker | Trust hardening; some of it (fuzzing) should be pulled into Phase 1 if any real gigs exist by then |
+| **4 · Trust** | Location fuzzing migration, contact reveal gating, report/block/dispute, meetup nudge, moderation queue, Hood Council, identity implementation migration from document upload to DigiLocker/offline XML | Trust hardening; some of it (fuzzing) should be pulled into Phase 1 if any real gigs exist by then |
 | **5 · Polish** | Night Board, day-rhythm scrubber, leaderboard, notification batching, Signal Boost, Trust Vouch, offline mode | The layer that makes it feel finished |
 
 ### K.8 Dependencies
