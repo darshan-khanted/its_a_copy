@@ -18,19 +18,24 @@ Requirements below are derived from the approved design document (`design.md`, s
 
 **Product vocabulary**
 
-- **the Field**: The proximity browse surface at `/hood/:pincode` — a custom SVG/DOM radar showing a hood's live gigs projected from real coordinates onto a disc of a given radius. The default authenticated route. Deliberately not a Google Maps basemap (design §C.1).
+- **the Field**: The proximity browse surface at `/hood/:pincode` — a custom SVG/DOM radar showing a hood's live gigs projected from published fuzzed coordinates onto a disc of a given radius. The default authenticated route. Deliberately not a Google Maps basemap (design §C.1).
 - **signal**: A gig, as rendered on the Field.
 - **flare**: The act of posting a gig — broadcasting a signal.
 - **hood**: A pincode-scoped area. Simultaneously the data partition key (`hoodId = pincode`), the social unit, and the launch switch.
 - **the Board**: The list view of a hood, at `/hood/:pincode/board`. A first-class alternative to the Field, not a fallback.
 - **handshake**: The negotiated agreement artefact between a poster and one doer, holding an append-only offer history, a state machine, and the agreed terms.
-- **rep**: The progression currency. A server-written integer equal to the sum of a user's rep ledger events.
+- **rep**: The progression currency. A server-written integer equal to the sum of countable ledger-event deltas: immediately applied grant events and release application events. Pending grant events remain excluded before and after release.
 - **rank**: One of five named tiers derived from rep plus non-rep gates: TAPPED_IN (01), HUSTLER (02), NEIGHBOURHOOD LEGEND (03), MAX CHARISMA (04), MYTH (05).
 - **unlock**: A capability granted by reaching a rank (active-claim limit, head start, photo attachment, Signal Boost, Trust Vouch, Hood Council).
 - **head start**: The rank-03+ privilege of seeing signals priced at or above ₹500 for 10 minutes before the rest of the hood.
 - **attestation**: A party's on-record statement that something happened — work done, or money settled. A record, never a transaction.
 - **fuzzing**: Deterministic displacement of a gig's exact coordinates before they are published, seeded once per gig and never re-rolled.
-- **ghost signal**: A hollow, dashed node on the Field representing a waitlist member in a pre-launch hood. Carries `price: 0` and the title `WAITING`, so it cannot be mistaken for a real gig.
+- **ghost signal**: A hollow, dashed node on the Field representing waitlist demand when a hood has zero real open gigs. Carries `price: 0` and the title `WAITING`, so it cannot be mistaken for a real gig.
+- **real open gig**: A published gig in the `OPEN` state that is available on the hood board; excludes ghost signals, waitlist demand, drafts, queued writes, and closed or matched gigs.
+- **sparse board**: A hood board containing between one and four real open gigs.
+- **preserved claim intent**: The gig identifier, one-liner, offered price, and availability response retained across authentication or identity verification so the Claim Flow can resume without requiring re-entry.
+- **pending ledger event**: One immutable record of an otherwise eligible rep grant withheld by a rep freeze or rolling velocity cap. The pending ledger event remains excluded from current rep before and after release.
+- **application event**: One immutable ledger event that references one pending ledger event and releases that pending grant exactly once. The application event, rather than the referenced pending ledger event, contributes the released delta to current rep.
 - **Day Zero Pass**: The founder identity card carried forward from the landing-page waitlist into the app, bearing a position number, a founder marker, and live rank/rep.
 - **Night Board**: The dark surface set (`data-surface="night"`) derived from the Day Zero Pass palette, for the 17:00–23:00 liquidity peak.
 
@@ -85,7 +90,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 
 1. THE Copy Module SHALL hold every user-facing string as a typed record under `src/copy/`, and no user-facing string SHALL be written inline in a component (§B.5).
 2. THE Copy Module SHALL provide in-voice strings for every validation error, loading state, and empty state, so that no error, loading, or empty surface ships with default or absent copy (§B.5, §E.9).
-3. THE Copy Module SHALL render expressive text — headlines, empty states, errors, user-authored titles — in lowercase, and functional text — labels, statuses, metadata, navigation — in uppercase mono with 0.14 em tracking (§B.5, §K.2).
+3. THE Copy Module SHALL render system-authored expressive text — including headlines, empty states, and errors — in lowercase and system-authored functional text — including labels, statuses, metadata, and navigation — in uppercase mono with 0.14 em tracking, and THE App Shell SHALL preserve every user-authored title and other user-authored text exactly as submitted, including casing and content (§B.5, §K.2).
 4. WHEN a monetary amount is displayed THEN the App Shell SHALL prefix it with `₹` and format it with `toLocaleString('en-IN')` so that one hundred thousand renders as `1,00,000` (§B.5).
 5. THE Copy Module SHALL contain at most one emoji per string, positioned at the end of the string, and SHALL contain no emoji in any uppercase mono label (§B.5).
 6. THE Copy Module SHALL express safety, payment, dispute, and verification copy in plain, warm, non-humorous language, and SHALL restrict humour to validation, empty, loading, and marketing surfaces (§K.2).
@@ -99,7 +104,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 #### Acceptance Criteria
 
 1. THE App Shell SHALL resolve `/hood/:pincode` to the Field and SHALL make it the default landing surface for an authenticated user (§C, §F.2).
-2. THE Field Surface SHALL render signals from each gig's stored coordinates via the Projection Module, and SHALL NOT position signals from hardcoded or hash-generated values (§C, §H.1).
+2. THE Field Surface SHALL position every real gig node from the gig's published fuzzed coordinates via the Projection Module, SHALL NOT read or render exact coordinates from the gig's private location subdocument on the Field, and SHALL NOT position signals from hardcoded or hash-generated values (§C, §E.7, §H.1).
 3. THE Field Surface SHALL represent a disc of radius 2000 m by default, centred on the hood centroid, and SHALL render distance rings at 250 m, 500 m, 1000 m, and 2000 m with mono labels (§C.2, §C.3).
 4. THE Field Surface SHALL anchor on the hood centroid without requesting any location permission, and WHERE the user opts in to precise location THE Field Surface SHALL re-anchor to the live point and mark the surface as `PRECISION: ON` (§C.2).
 5. WHEN a point lies beyond the Field radius THEN THE Projection Module SHALL clamp it to the disc boundary and SHALL NOT drop it (§H.1).
@@ -192,13 +197,17 @@ Requirements below are derived from the approved design document (`design.md`, s
 
 #### Acceptance Criteria
 
-1. WHEN a hood has no open signals THEN THE Field Surface SHALL render ghost signals derived from that hood's real waitlist count as hollow dashed nodes labelled `WAITING` (§E.9, §K.4).
-2. THE Field Surface SHALL generate every ghost signal with `price: 0` and the title `WAITING`, so that a ghost signal is structurally distinguishable from a gig (§H.8, §K.4).
+1. WHEN a hood has zero real open gigs THEN THE Field Surface SHALL render ghost signals derived from that hood's real waitlist count as hollow dashed nodes labelled `WAITING` (§E.9, §K.4).
+2. THE Field Surface SHALL generate every ghost signal with `price: 0` and the title `WAITING`, and SHALL exclude every ghost signal from signal counts, total rupee value, clusters, signal detail, and claim actions (§H.8, §K.4).
 3. THE Field Surface SHALL NOT generate, hash, or otherwise synthesise any signal that represents a gig (§C.9, §K.4).
 4. WHEN a hood is below its launch threshold THEN THE Field Surface SHALL display the hood progress meter in the form `N / M NEIGHBOURS · OPENS AT M` and a share action to recruit more members (§E.9, §K.4).
-5. THE Field Surface SHALL offer a `BE FIRST` action in the empty state that states the first-flare rep bonus, and a `LOOK AT NEARBY HOODS` action that widens to the adjacency list with results labelled as further away (§E.9, §K.4).
+5. WHEN a hood has zero real open gigs THEN THE Field Surface SHALL offer a `BE FIRST` action and a `LOOK AT NEARBY HOODS` action that widens to the adjacency list with results labelled as further away (§E.9, §K.4).
 6. WHERE a gig was posted by the operating team, THE App Shell SHALL mark it with a `QG TEAM` marker rather than presenting it as an ordinary user's gig (§K.4).
 7. WHEN ghost signals are placed THEN THE Field Surface SHALL place them deterministically from the hood identifier so that positions do not move between renders (§H.8).
+8. WHEN a hood has one or more real open gigs THEN THE Field Surface SHALL render only real gig nodes and clusters in the primary Field and SHALL render zero ghost signals among those nodes.
+9. WHILE a sparse board is displayed, THE Field Surface SHALL report the exact real open-gig count and total rupee value and SHALL offer both a `POST A FLARE` action and a `LOOK AT NEARBY HOODS` action.
+10. WHERE waitlist demand is available for a hood with one or more real open gigs, THE Field Surface SHALL render that demand only as a separately positioned indicator labelled `WAITLIST`, with a count or progress value, and SHALL NOT render the demand as signal or cluster nodes.
+11. WHERE a viewer qualifies for the first-flare rep bonus, THE Field Surface SHALL state the bonus next to the flare action in both the zero-real-open-gig state and the sparse-board state.
 
 ### Requirement 10: Flaring a gig
 
@@ -217,7 +226,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 9. WHEN a poster marks a flare urgent THEN THE App Shell SHALL render the signal with the urgent treatment and SHALL expire the gig 6 hours after publication (§E.2).
 10. WHERE the poster's rank does not include the photo-attachment unlock, THE Compose Flow SHALL withhold photo attachment (§D.5).
 11. WHEN a flare is published THEN THE App Shell SHALL write exact coordinates only to the gig's private location subdocument and SHALL publish only the fuzzed coordinates, the geohash, the hood identifier, and a human area label (§E.7, §H.3).
-12. IF the user is offline while composing THEN THE Compose Flow SHALL persist the draft and queue the flare for publication when connectivity returns (§E.9).
+12. IF the user is offline while composing THEN THE Compose Flow SHALL persist the draft and queue one idempotent publication request that creates at most one gig when connectivity returns (§E.9).
 
 ### Requirement 11: Claiming — the claim ritual
 
@@ -230,12 +239,14 @@ Requirements below are derived from the approved design document (`design.md`, s
 3. THE Claim Flow SHALL prefill the offer price with the asking price and SHALL adjust it in ₹25 increments (§E.3).
 4. WHEN the submitted price differs from the asking price THEN THE Claim Flow SHALL record the claim as a counter-offer, without a separate negotiate mode (§E.3).
 5. THE Claim Flow SHALL collect the doer's availability response for the requested time (§E.3).
-6. WHEN a claim is submitted THEN THE Handshake Engine SHALL create a handshake keyed `{gigId}_{doerUid}` and THE App Shell SHALL create the chat thread with the handshake card as its first item and the doer's own one-liner as the first human message (§E.3, §G.4).
-7. WHEN the same doer submits a claim on the same gig again THEN THE Handshake Engine SHALL return the existing handshake rather than creating a second one (§E.4, §G.7).
+6. WHEN an eligible claim is submitted THEN THE Handshake Engine SHALL commit the handshake keyed `{gigId}_{doerUid}`, the chat thread with the handshake card as its first item, the doer's one-liner as the first human message, and the gig's claim-count increment as one atomic operation that leaves all four unchanged if any required write fails (§E.3, §G.4).
+7. WHEN the same doer retries a claim on the same gig THEN THE Handshake Engine SHALL return the existing handshake and chat thread without creating a second handshake, duplicating the first human message, or incrementing the claim count again (§E.4, §G.7).
 8. THE Claim Flow SHALL present the poster's candidate list showing each candidate's rank chip, rep, one-liner, offered price, and distance (§E.3).
 9. THE Field Surface SHALL display the claim count on a signal node (§E.3).
 10. IF the number of the doer's active claims has reached the limit granted by their rank THEN THE Claim Flow SHALL refuse the claim and state the limit and the rank that raises it (§D.5).
-11. IF the doer is not identity-verified THEN THE Claim Flow SHALL refuse the claim and route the user to verification (§E.7).
+11. WHEN an authenticated but identity-unverified doer attempts to claim a gig THEN THE Claim Flow SHALL preserve the gig identifier, one-liner, offered price, and availability response; create no handshake, chat thread, first message, or claim-count increment; and route the doer to identity verification (§E.1, §E.7).
+12. WHEN identity verification for a doer with a preserved claim intent is approved THEN THE Claim Flow SHALL recheck that the gig remains `OPEN`, the doer meets the gig's minimum rank, and the doer's active-claim count remains below the rank allowance; submit the preserved claim only if every check passes; and otherwise retain the preserved intent without creating a handshake, chat thread, first message, or claim-count increment.
+13. WHILE an identity-verified doer remains rank 01, THE Claim Flow SHALL permit the rank-01 allowance of one active claim.
 
 ### Requirement 12: The Handshake state machine
 
@@ -299,15 +310,15 @@ Requirements below are derived from the approved design document (`design.md`, s
 
 1. THE Rep Engine SHALL be the only writer of rep, rep version, rank, heat, distinct-counterparty count, upheld-report count, and streak fields (§D.2, §G.6).
 2. THE Security Rules SHALL deny every client write to those fields and to `repEvents`, and SHALL deny client writes to `verified` and verification status (§D.4, §G.6, §J.1).
-3. THE Rep Engine SHALL append an immutable ledger event for every grant, and a user's rep SHALL always equal the sum of that user's non-deferred ledger events, floored at 0 (§D.2, §H.4, §J.1).
-4. WHEN a grant request repeats an idempotency key that has already been applied THEN THE Rep Engine SHALL apply no change and SHALL report the same resulting rep as the original grant (§D.2, §H.4, §J.1).
-5. THE Rep Engine SHALL increment the rep version strictly monotonically on each applied grant (§D.2, §H.4).
+3. THE Rep Engine SHALL append one immutable grant event for every otherwise eligible grant; SHALL count an immediately applied grant event toward current rep; and, when a rep freeze or rolling velocity cap withholds the grant, SHALL record the grant as one pending ledger event that remains excluded from current rep before and after release (§D.2, §H.4, §J.1).
+4. WHEN a grant or release request repeats an idempotency key already recorded for the corresponding grant event or application event THEN THE Rep Engine SHALL append no duplicate event, apply no additional rep, and report the same current-rep result as the original request (§D.2, §H.4, §J.1).
+5. THE Rep Engine SHALL increment the rep version strictly monotonically for each immediately applied grant event and each release application event that contributes a delta to current rep (§D.2, §H.4).
 6. FOR ALL non-penalty event kinds, THE Rep Engine SHALL never decrease a user's rep (§D.3, §J.1).
-7. THE Rep Engine SHALL grant +40 for completion as doer, +18 for completion as poster, `(rating − 3) × 8` for a received rating, +15 for a review given within 24 hours, +6 for a review given within the 72-hour grace window, up to +10 for response speed, +60 for identity verification, +15 for phone verification, +10 for claiming a hood once ever, +50 for a first flare in a hood, and +25 per streak week (§D.3).
+7. THE Rep Engine SHALL grant +40 for completion as doer, +18 for completion as poster, `(rating − 3) × 8` for a received rating, +15 for a review given within 24 hours, +6 for a review given within the 72-hour grace window, up to +10 for response speed, a one-time +60 when identity verification is approved, +15 for phone verification, +10 for claiming a hood once ever, +50 for a first flare in a hood, and +25 per streak week (§D.3).
 8. THE Rep Engine SHALL apply −150 for an upheld report, −80 for a confirmed no-show, and −20 for an abandoned handshake (§D.3).
 9. THE Rep Engine SHALL grant exactly 0 rep for holding a Day Zero Pass (§D.3).
 10. THE Rep Engine SHALL grant rep for a handshake-derived event only when that handshake is SETTLED and the recipient is one of its two distinct participants (§H.4).
-11. THE Rep Engine SHALL provide a recompute-from-ledger operation whose result equals the stored rep, and THE App Shell SHALL render every ledger event to its owner as an auditable receipt line at `/me/rep` (§D.2, §D.8).
+11. THE Rep Engine SHALL provide a recompute-from-ledger operation whose result equals stored current rep and the sum of immediately applied grant-event deltas and release application-event deltas, floored at 0, while excluding every pending grant event; THE App Shell SHALL render every grant and application event to its owner as an auditable receipt line at `/me/rep` (§D.2, §D.8).
 12. THE Rep Engine SHALL maintain heat as a separately decaying 90-day activity score used only for display and activity surfaces, and SHALL NOT use heat to determine rank (§D.3).
 
 ### Requirement 16: Rep anti-gaming
@@ -321,7 +332,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 3. THE Rep Engine SHALL refuse rep for a settled handshake whose agreed price is below ₹50 or whose elapsed time from start to settlement is below 8 minutes (§D.4, §H.4).
 4. THE Rep Engine SHALL refuse rep where the two parties are the same identity or share a phone hash (§D.4, §H.4).
 5. THE App Shell SHALL enforce phone uniqueness through a create-once `phoneIndex/{phoneHash}` document rather than a client-side existence query (§D.4, §G.5).
-6. THE Rep Engine SHALL withhold new positive grants beyond 200 rep per rolling day or 700 rep per rolling week, SHALL record the excess as a deferred ledger event, and SHALL apply it in a later window rather than discarding it (§D.4, §H.4).
+6. THE Rep Engine SHALL withhold each positive grant that exceeds 200 rep per rolling day or 700 rep per rolling week as one immutable pending ledger event; SHALL release pending grants in original grant-time order as rolling capacity becomes available; SHALL append exactly one immutable application event referencing each released pending event; and SHALL retain every unreleased grant without forfeiture or mutation (§D.4, §H.4).
 7. THE App Shell SHALL withhold each party's review from the other until both parties have submitted or 7 days have passed (§D.4, §E.6).
 8. THE App Shell SHALL accept at most one review per party per settled handshake, enforced by the deterministic review identifier `{handshakeId}_{reviewerUid}` (§D.4, §G.6).
 9. THE Rep Engine SHALL grant the first-flare-in-hood bonus only while that hood's gig count is below 10 and only once per user per hood (§D.3, §H.4).
@@ -333,7 +344,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 #### Acceptance Criteria
 
 1. THE Rep Engine SHALL define five ranks with rep thresholds of 0, 100, 400, 1200, and 3000 (§D.5).
-2. THE Rep Engine SHALL additionally require identity verification for rank 02, at least 8 distinct counterparties for rank 03, at least 20 distinct counterparties for rank 04, and zero upheld reports for rank 05 (§D.5).
+2. THE Rep Engine SHALL independently require identity verification and the 100-rep threshold for rank 02, at least 8 distinct counterparties for rank 03, at least 20 distinct counterparties for rank 04, and zero upheld reports for rank 05 (§D.5).
 3. FOR ALL pairs of rep values with all other gates equal, THE Rep Engine SHALL never assign a lower rank to the higher rep value (§H.5, §J.6).
 4. THE Rep Engine SHALL never assign a rank whose non-rep gates are unmet (§H.5, §J.6).
 5. WHEN a user's rep falls THEN THE Rep Engine SHALL demote only once rep drops below the current rank's threshold by more than 75 (§D.7, §H.5, §J.6).
@@ -343,6 +354,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 9. WHILE a rank is unreached, THE Identity Surface SHALL render its reward as redacted with its teaser line (§D.5).
 10. WHEN a user crosses into rank 04 or rank 05 THEN THE Identity Surface SHALL play the reveal takeover that lifts the redaction, decodes the reward names, and stamps the new rank chip (§D.5).
 11. THE Rep Engine SHALL never revoke a rank for inactivity (§D.3, §D.7).
+12. WHEN a rank-01 user completes identity verification THEN THE Rep Engine SHALL satisfy only the verification gate for rank 02 and SHALL keep the user at rank 01 until the independently required 100-rep threshold is met.
 
 ### Requirement 18: Rep gates real access to signals
 
@@ -354,10 +366,12 @@ Requirements below are derived from the approved design document (`design.md`, s
 2. WHEN a rank-03-or-above user views a gig inside its head-start window THEN THE Field Surface SHALL mark the signal with an early label and a countdown (§D.6).
 3. WHERE a poster sets a minimum rank on a flare, THE Field Surface SHALL render that signal as redacted to users below the floor, stating the rank that unlocks it (§D.6).
 4. THE Compose Flow SHALL cap a poster-set minimum rank at rank 03 (§D.6).
-5. THE App Shell SHALL cap rank-gated gigs at 25% of a hood's open board (§D.6).
+5. WHEN `(existing rank-gated real open gigs + 1) / (existing real open gigs + 1)` would exceed 0.25 for a poster-selected minimum rank THEN THE Compose Flow SHALL reject or disable only the minimum-rank option, explain that the hood cap has been reached, and keep public flare publication available (§D.6).
 6. THE App Shell SHALL enforce rank-based visibility in both the query filter and the security rules, so that a gated gig's full document is unreadable to an ineligible user (§D.6).
 7. FOR ALL open gigs, viewers, and times, IF a signal is visible to a viewer at one time THEN it SHALL remain visible to that viewer at every later time while the gig stays open (§H.5, §J.6).
 8. WHEN a rank-03-or-above user and a rank-01 user are compared at the head-start opening instant THEN THE App Shell SHALL show the signal to the former and withhold it from the latter (§D.6, §J.6).
+9. WHEN a poster chooses public publication after the hood's rank-gated cap rejects a minimum rank THEN THE Compose Flow SHALL require explicit confirmation of public visibility before publishing the flare without a minimum rank.
+10. IF the hood's rank-gated cap rejects a minimum rank, THEN THE Compose Flow SHALL preserve every entered composer value, keep the flare in the active composer for an explicit decision about public publication, and neither silently remove the gate nor queue, hide, or automatically publish the flare.
 
 ### Requirement 19: Closing the loop without holding the account hostage
 
@@ -371,10 +385,12 @@ Requirements below are derived from the approved design document (`design.md`, s
 4. WHEN a handshake settles THEN THE Loop Flow SHALL present a dismissible review card at the top of the feed stating the reward for reviewing within 24 hours (§E.6).
 5. WHILE a review remains unsubmitted between 24 and 72 hours after settlement, THE Loop Flow SHALL keep the card available at the reduced reward (§E.6).
 6. WHEN 72 hours have passed without a review THEN THE Notification Service SHALL send exactly one reminder and THE Loop Flow SHALL move the card to the user's profile (§E.6).
-7. IF more than 7 days have passed and the user has 3 or more unreviewed settled handshakes THEN THE Rep Engine SHALL stop accruing new rep for that user until one review is submitted, and THE App Shell SHALL state the freeze and its remedy (§E.6).
-8. THE Rep Engine SHALL treat rep freeze as the only consequence of unclosed loops (§E.6).
-9. THE Loop Flow SHALL accept a review as a rating, an optional tag from the fixed set, and an optional line, and SHALL NOT require a written comment (§E.6).
-10. THE Identity Surface SHALL display the user's closed-loop streak (§E.6).
+7. IF more than 7 days have passed and the user has 3 or more unreviewed settled handshakes, THEN THE Rep Engine SHALL activate an overdue-review rep freeze and THE App Shell SHALL state the freeze and the one-review thaw remedy (§E.6).
+8. WHILE an overdue-review rep freeze is active, THE Rep Engine SHALL record every otherwise eligible new rep grant as one immutable pending ledger event, exclude the pending ledger event from current rep before and after release, and retain the grant without forfeiture until release is permitted.
+9. WHEN the user submits one overdue review during an overdue-review rep freeze THEN THE Rep Engine SHALL thaw the freeze and release pending grants exactly once in original grant-time order by appending one immutable application event that references each released pending event, subject to the 200-rep rolling-day cap and 700-rep rolling-week cap, while retaining every cap-excess grant as an unchanged pending ledger event.
+10. WHILE an overdue-review rep freeze is active, THE App Shell SHALL keep navigation, chat, authentication, profile, account-management, flaring, claiming, and live-gig coordination available under their normal eligibility rules (§E.6).
+11. THE Loop Flow SHALL accept a review as a rating, an optional tag from the fixed set, and an optional line, and SHALL NOT require a written comment (§E.6).
+12. THE Identity Surface SHALL display the user's closed-loop streak (§E.6).
 
 ### Requirement 20: Location privacy
 
@@ -431,10 +447,10 @@ Requirements below are derived from the approved design document (`design.md`, s
 
 #### Acceptance Criteria
 
-1. THE App Shell SHALL allow an unauthenticated user to claim a hood, browse the Field and the Board, and open signal detail (§E.1).
+1. THE App Shell SHALL allow a user to claim a hood, browse the Field and the Board, and open signal detail before authentication and before identity verification (§E.1).
 2. THE App Shell SHALL require authentication for claiming a gig, flaring a gig, and chatting (§E.1).
-3. WHEN an unauthenticated user triggers an action that requires an account THEN THE App Shell SHALL record the intended action, present a single-step auth sheet, and complete the original action after authentication (§E.1).
-4. THE App Shell SHALL NOT require identity-document upload during first run, and SHALL request it at the rank-02 gate framed as an earned badge with its stated rep reward (§E.1).
+3. WHEN an unauthenticated user triggers an action that requires an account THEN THE App Shell SHALL record the intended action, present a single-step auth sheet, and continue the original action through all remaining eligibility gates after authentication (§E.1).
+4. WHEN a rank-01 account is created THEN THE Identity Surface SHALL make identity verification available immediately and SHALL NOT lock identity verification behind rank 02 (§E.1, §E.7).
 5. WHILE identity verification is pending, THE Identity Surface SHALL render the verified chip as redacted with an `UNDER REVIEW` status rather than showing nothing (§E.1).
 6. WHEN a hood is claimed successfully THEN THE App Shell SHALL play the flag-planting sequence and confirm the claim in voice (§E.1).
 7. THE App Shell SHALL NOT gate navigation on incomplete onboarding (§E.1).
@@ -619,7 +635,7 @@ Requirements below are derived from the approved design document (`design.md`, s
 ### NFR-5 Reliability and integrity
 
 1. Exactly one AGREED handshake per gig under any interleaving of concurrent accepts (§E.4, §J.2).
-2. Rep equals the sum of a user's non-deferred ledger events at all times; every grant is idempotent by key (§D.2, §J.1).
+2. Current rep equals the ledger sum of immediately applied grant-event deltas and release application-event deltas, floored at 0; each withheld grant remains one immutable pending event excluded before and after release; each release references that pending event exactly once; and every grant and release is idempotent by key (§D.2, §J.1).
 3. Notification emission is idempotent by deterministic identifier (§E.8, §J.7).
 4. Platform take is always exactly ₹0; no server route holds, forwards, or reconciles funds (§E.5, §J.8).
 5. Projection preserves distance ordering and bearing; round-trip error within 1 m or one part per million of the radius (§H.1, §J.4).
@@ -636,7 +652,7 @@ These are recorded rather than resolved, per design §K.5. Each affects requirem
 1. **Rep calibration (§D.3, §K.5.1).** The rep weights and rank thresholds in Requirements 15 and 17 are a first-pass calibration, not a final one. Assumption: the values are implemented as named constants in one shared module so recalibration after the first hood does not require touching call sites.
 2. **The contents behind the redacted ranks (§D.5, §K.5.2).** Requirement 17.7 encodes Signal Boost, Trust Vouch, and Hood Council as the design's proposal. Trust Vouch in particular carries an unresolved abuse and social-pressure question. Assumption: the reveal mechanism (17.9, 17.10) is independent of the specific rewards, so the rewards can change without reworking the reveal.
 3. **Age policy (§K.5.3).** The existing prototype enforces 16+. Whether doers must be 18+ while posters may be 16+ is unresolved. No requirement above fixes an age threshold.
-4. **Identity verification mechanism (§K.5.4).** Requirements 21.9 and 23.4 are written to be satisfied by either document upload with post-approval deletion or a DigiLocker / offline-XML flow that never holds the image. The design recommends migrating to the latter; the choice is open.
+4. **Identity verification mechanism (§K.5.4).** The timing and access policy are settled: verification is available immediately after account creation, required before the first gig claim, and remains a rank-02 prerequisite. The remaining open choice is implementation mechanism only. Requirement 21.9 can be satisfied by document upload with post-approval deletion or by a DigiLocker / offline-XML flow that never stores an identity image; the design recommends migrating to the latter.
 5. **Head-start direction (§D.6, §K.5.5).** Requirement 18 encodes the head start as a rank-03+ privilege. Whether it should invert into a rookie window for a user's first gigs is an open product question that would change 18.1, 18.2, and 18.8.
 6. **UI language (§I.4, §K.5.6).** All copy requirements assume an English-with-Hindi-inflection voice and a latin font subset. Whether Hindi, Kannada, Tamil, or Bengali UI is needed is open, and the answer changes the font-subsetting requirements in 28.4.
 7. **Whether the Board survives (§K.5.7).** Requirement 7 treats the Board as first-class. If Field usage dominates after launch, the Board may be demoted to an accessibility-and-search surface. Both surfaces are instrumented from day one.
