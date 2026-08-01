@@ -244,6 +244,17 @@ service cloud.firestore {
     }
 
     // ==================================================================
+    // verificationEvents/{id} — unprocessed identity-verification facts (task 5.2, §D.3).
+    // Server-write-only, server-write-only fan-in for the Rep Engine's one-time
+    // IDENTITY_VERIFIED +60 grant (task 7.2). No client read or write — this is an
+    // internal handoff, not a user-facing receipt (that lives at repEvents once the Rep
+    // Engine applies it), so it carries the same default-deny posture as repEvents.
+    // ==================================================================
+    match /verificationEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    // ==================================================================
     // reviews/{handshakeId}_{reviewerUid} — public after release; author
     // create-once, immutable thereafter (§G.6.7)
     // ==================================================================

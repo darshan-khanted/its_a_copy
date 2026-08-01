@@ -13,6 +13,7 @@ export interface ComposeDraft {
   startDate: string;
   startTime: string;
   urgent: boolean;
+  photoUrl: string | null;
 }
 
 export const emptyComposeDraft: ComposeDraft = {
@@ -23,6 +24,7 @@ export const emptyComposeDraft: ComposeDraft = {
   startDate: '',
   startTime: 'FLEXIBLE',
   urgent: false,
+  photoUrl: null,
 };
 
 interface UiState {

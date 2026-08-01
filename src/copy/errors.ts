@@ -17,6 +17,8 @@ export const errors = {
   priceZero: 'put a real number — ₹0 is a favour, not a gig',
   priceWild: 'that is a lot of money — confirm to continue',
   titleEmpty: 'tell us what you actually need doing',
+  bodyEmpty: 'a couple more lines helps people say yes',
+  dateRequired: 'pick a date — today works',
   pincodeBad: 'enter 6 digits — the one on your courier packages',
   consentUnticked: "tick this to prove you're not a menace 😤",
   oneLinerTooShort: 'say a bit more — at least 10 characters',

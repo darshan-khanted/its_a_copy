@@ -8,10 +8,12 @@ import { startGigTimeframeChecks } from "./services/gigMonitor";
 
 import authRoutes from "./routes/auth";
 import hoodRoutes from "./routes/hoods";
+import gigRoutes from "./routes/gigs";
 import emailRoutes from "./routes/emails";
 import uploadRoutes from "./routes/uploads";
 import cronRoutes from "./routes/cron";
 import adminRoutes from "./routes/admin";
+import verificationRoutes from "./routes/verification";
 
 installConsoleFileLogging();
 
@@ -30,10 +32,12 @@ async function startServer() {
   // ---- API routers (mounted before the SPA fallback) ----
   app.use("/api/auth", authRoutes);
   app.use("/api/hoods", hoodRoutes);
+  app.use("/api/gigs", gigRoutes);
   app.use("/api/emails", emailRoutes);
   app.use("/api", uploadRoutes); // POST /api/upload
   app.use("/api/cron", cronRoutes);
   app.use("/api/admin", adminRoutes);
+  app.use("/api/verification", verificationRoutes);
 
   // Serve uploaded files as a static endpoint (read-only).
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));

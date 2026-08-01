@@ -26,6 +26,8 @@ export {
   onTheBoard,
   ringLabel,
   claimsTally,
+  reachLine,
+  priceGuidanceLine,
   type LabelKey,
 } from './labels';
 export {

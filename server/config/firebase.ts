@@ -135,6 +135,11 @@ export function getFirebaseAdminDb(): any {
               data: () => snap.data(),
             };
           },
+          set: (docWrapper: any, data: any, options?: any) => {
+            const realDocRef = docWrapper._realDocRef || docWrapper.ref || docWrapper;
+            if (options?.merge) tx.set(realDocRef, data, { merge: true });
+            else tx.set(realDocRef, data);
+          },
           update: (docWrapper: any, data: any) => {
             const realDocRef = docWrapper._realDocRef || docWrapper.ref || docWrapper;
             tx.update(realDocRef, data);

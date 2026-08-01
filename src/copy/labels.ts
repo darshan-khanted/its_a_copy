@@ -80,6 +80,22 @@ export const labels = {
 
   // Hood claim (design §C.7)
   notFoundArea: 'NOT FOUND — YOU CAN STILL TYPE YOUR AREA',
+
+  // Compose Flow beats (design §E.2, req 10.1)
+  composeWhat: 'WHAT',
+  composeValue: 'VALUE',
+  composeWhen: 'WHERE & WHEN',
+  next: 'NEXT',
+  back: 'BACK',
+  publishFlare: 'SEND THE FLARE',
+  today: 'TODAY',
+  tomorrow: 'TOMORROW',
+  thisWeek: 'THIS WEEK',
+  flexible: 'FLEXIBLE',
+  addPhoto: 'ADD A PHOTO',
+  median: 'MEDIAN',
+  makeItUrgent: 'MAKE IT URGENT',
+  urgentNote: 'EXPIRES IN 6 HOURS',
 } as const;
 
 export type LabelKey = keyof typeof labels;
@@ -148,4 +164,21 @@ export function ringLabel(radiusM: number): string {
  */
 export function claimsTally(count: number): string {
   return `${count} ${count === 1 ? 'CLAIM' : 'CLAIMS'}`;
+}
+
+/**
+ * The Compose Flow's broadcast-reach line (design §E.2, req 10.7): how many
+ * neighbours this flare will reach, from the hood's real 30-day active member
+ * count. Functional uppercase mono.
+ */
+export function reachLine(activeMembers30d: number): string {
+  return `REACHING ${activeMembers30d} ${activeMembers30d === 1 ? 'NEIGHBOUR' : 'NEIGHBOURS'}`;
+}
+
+/**
+ * The Compose Flow's price-guidance range (design §E.2, req 10.4): the hood's
+ * real 25th-to-75th-percentile band. `rupees(...)` values are pre-formatted.
+ */
+export function priceGuidanceLine(p25: string, p75: string): string {
+  return `SIMILAR GIGS WENT FOR ${p25}–${p75}`;
 }

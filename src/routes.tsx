@@ -14,6 +14,7 @@ import { Inbox } from '@/features/chat/Inbox';
 import { Thread } from '@/features/chat/Thread';
 import { AlertsList } from '@/features/notifications/AlertsList';
 import { MeScreen } from '@/features/identity/MeScreen';
+import { VerifyScreen } from '@/features/identity/VerifyScreen';
 import { PublicProfile } from '@/features/identity/PublicProfile';
 import { RepLedger } from '@/features/rep/RepLedger';
 import { AuthSheet } from '@/features/identity/AuthSheet';
@@ -81,7 +82,7 @@ export function AppRoutes() {
           <Route path="/me/rep" element={<RepLedger />} />
           <Route path="/me/flares" element={<PhaseScreen title="my flares" note="arrives in phase 2." />} />
           <Route path="/me/claims" element={<PhaseScreen title="my claims" note="arrives in phase 2." />} />
-          <Route path="/me/verify" element={<PhaseScreen title="verify" note="identity verification arrives in phase 2." />} />
+          <Route path="/me/verify" element={<VerifyScreen />} />
           <Route path="/alerts" element={<AlertsList />} />
         </Route>
 

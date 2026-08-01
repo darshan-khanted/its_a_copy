@@ -46,6 +46,16 @@ export interface Handshake {
   };
   attestations: { done: Record<string, number>; paid: Record<string, number> };
   paymentMethod?: 'upi' | 'cash';
+  /**
+   * Set by the RESOLVE action (design §H.6) when a moderator settles or voids a
+   * DISPUTED handshake. Distinguishes a moderator-settled handshake from one
+   * settled by two ordinary attestations, which is required to state design
+   * §J.2's own property P2.7 ("SETTLED requires both attestations, OR when a
+   * moderator resolves a dispute in favour of settlement" — requirement 12.11).
+   * Flagged addition: not present in the original type; genuinely missing
+   * because no existing field could express this distinction.
+   */
+  wasModeratorResolved?: boolean;
   meetupNudgeShown: boolean;
   threadId: string;
   createdAt: number;
