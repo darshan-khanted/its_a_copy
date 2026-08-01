@@ -247,7 +247,7 @@ Implement the redesign incrementally in TypeScript on the approved React 18 + Vi
     - **Property P2.7: Settlement requires both attestations or moderator resolution**
     - **Validates: Requirements 12.11**
 
-  - [ ] 5.14 Implement server-authoritative Handshake transitions and single-winner acceptance
+  - [x] 5.14 Implement server-authoritative Handshake transitions and single-winner acceptance
     - Wrap reducer effects in authenticated endpoints; compare-and-set `agreedHandshakeId`, set the gig to MATCHED, and decline all other live candidates atomically.
     - Add expiry processing, duplicate-attestation rejection, moderator-only resolution, and client-write-denying rules.
     - _Requirements: 12.8, 12.9, 12.11, 12.12, 12.14, 12.15; NFR-5.1_

@@ -15,6 +15,7 @@ import cronRoutes from "./routes/cron";
 import adminRoutes from "./routes/admin";
 import verificationRoutes from "./routes/verification";
 import claimRoutes from "./routes/claims";
+import handshakeRoutes from "./routes/handshakes";
 
 installConsoleFileLogging();
 
@@ -40,6 +41,7 @@ async function startServer() {
   app.use("/api/admin", adminRoutes);
   app.use("/api/verification", verificationRoutes);
   app.use("/api/claims", claimRoutes);
+  app.use("/api/handshakes", handshakeRoutes);
 
   // Serve uploaded files as a static endpoint (read-only).
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
