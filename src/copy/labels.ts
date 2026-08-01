@@ -37,8 +37,22 @@ export const labels = {
   waiting: 'WAITING',
   waitlist: 'WAITLIST',
   precisionOn: 'PRECISION: ON',
+  precisionOff: 'PRECISION: OFF',
   urgent: 'URGENT',
   qgTeam: 'QG TEAM',
+
+  // Field chrome (design §C.3)
+  you: 'YOU',
+  close: 'CLOSE',
+  openSignal: 'OPEN SIGNAL',
+  openBoard: 'OPEN BOARD',
+
+  // Board controls (design §C.8, req 7.2, 7.5, 25.8)
+  sortBy: 'SORT',
+  search: 'SEARCH',
+  clearSearch: 'CLEAR',
+  openToAll: 'OPEN TO ALL',
+  signals: 'SIGNALS',
 
   // Metadata
   rep: 'REP',
@@ -78,8 +92,60 @@ export function showingOf(shown: number, total: number): string {
 }
 
 /**
+ * The Board's tally line: how many signals are listed and what they are worth
+ * (design §C.8). `value` is already rupee-formatted by `rupees()`.
+ */
+export function boardTally(count: number, value: string): string {
+  return `${count} SIGNALS · ${value} ON THE BOARD`;
+}
+
+/**
+ * How much of the board a search is showing (req 7.5). Functional uppercase mono.
+ */
+export function matchTally(shown: number, total: number): string {
+  return `${shown} OF ${total} MATCH`;
+}
+
+/**
  * Hood pre-launch progress line (req 9.4). Functional uppercase mono.
  */
 export function hoodProgress(current: number, target: number): string {
   return `${current} / ${target} NEIGHBOURS · OPENS AT ${target}`;
+}
+
+/**
+ * The Field footer's count of real signals inside the disc (design §C.3, req 3.9).
+ * Ghost nodes are never counted here — the number comes from the real-supply
+ * metrics (req 9.2).
+ */
+export function signalsInRange(count: number): string {
+  return `${count} ${count === 1 ? 'SIGNAL' : 'SIGNALS'} IN RANGE`;
+}
+
+/**
+ * The Field footer's total real rupee value (design §C.3, req 3.9). `value` is
+ * already rupee-formatted by `rupees()`.
+ */
+export function onTheBoard(value: string): string {
+  return `${value} ON THE BOARD`;
+}
+
+/**
+ * Distance-ring label on the Field (design §C.3, req 3.3): `250 M` … `2 KM`.
+ */
+export function ringLabel(radiusM: number): string {
+  if (radiusM >= 1000) {
+    const km = radiusM / 1000;
+    const text = Number.isInteger(km) ? String(km) : km.toFixed(1);
+    return `${text} KM`;
+  }
+  return `${Math.round(radiusM)} M`;
+}
+
+/**
+ * Claim tally on a signal (req 28-adjacent Field chrome, design §C.3): how many
+ * neighbours have raised a hand. Functional uppercase mono.
+ */
+export function claimsTally(count: number): string {
+  return `${count} ${count === 1 ? 'CLAIM' : 'CLAIMS'}`;
 }

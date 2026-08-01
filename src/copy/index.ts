@@ -16,6 +16,25 @@
 export { errors, type ErrorKey } from './errors';
 export { loading, type LoadingKey } from './loading';
 export { empty, authGate, hoodClaimedLine, type EmptyKey } from './empty';
-export { labels, showingOf, hoodProgress, type LabelKey } from './labels';
+export {
+  labels,
+  showingOf,
+  hoodProgress,
+  boardTally,
+  matchTally,
+  signalsInRange,
+  onTheBoard,
+  ringLabel,
+  claimsTally,
+  type LabelKey,
+} from './labels';
+export {
+  fieldVoice,
+  COMPASS_OCTANTS,
+  claimedWords,
+  agoWords,
+  type CompassOctant,
+  type FieldVoiceKey,
+} from './field';
 export { placeholders, REAL_HOOD_NAMES, type PlaceholderKey } from './placeholders';
 export { safety, type SafetyKey } from './safety';

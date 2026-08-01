@@ -160,6 +160,143 @@ body {
   }
 }
 
+/*
+ * The Board's list grid (§I.7): single column on a phone, 2 columns from 768px, 3 from 1024px.
+ * Layout only — every gap is a space token and no colour or stroke value appears here.
+ */
+.board-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  list-style: none;
+}
+@media (min-width: 768px) {
+  .board-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+}
+@media (min-width: 1024px) {
+  .board-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ============================== the Field (§C.3, §C.4, §I.7) ============================== */
+/*
+ * The radar surface: a square disc viewport with the layer ladder from §C.3 (paper 0, rings 1,
+ * radar/spotlight 2, YOU 8, nodes 10). Every z-index is the token from theme.css, every colour
+ * is a token, and there is no basemap of any kind (requirement 20.9, NFR-4.5).
+ */
+.field-disc {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 62vh; /* the 360px design target (§I.7) */
+  overflow: hidden;
+  border: var(--box-border) solid var(--line);
+  background-color: var(--surface-2);
+  /* the scan gesture owns vertical drags inside the disc (§C.4) */
+  touch-action: none;
+}
+@media (min-width: 480px) {
+  .field-disc {
+    min-height: 68vh;
+  }
+}
+@media (min-width: 768px) {
+  .field-disc {
+    min-height: 0;
+    max-width: 620px;
+    margin-inline: auto;
+  }
+}
+
+.field-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.field-layer-bg {
+  z-index: var(--z-field-bg);
+}
+.field-layer-rings {
+  z-index: var(--z-field-rings);
+}
+.field-layer-radar {
+  z-index: var(--z-field-radar);
+}
+.field-layer-you {
+  z-index: var(--z-field-you);
+}
+.field-layer-nodes {
+  z-index: var(--z-field-nodes);
+}
+
+/* The 9s sweep. GPU-only rotation; disabled by reduced motion in index.css. */
+.field-radar-sweep {
+  background-image: conic-gradient(
+    from 0deg,
+    transparent 0deg 296deg,
+    color-mix(in srgb, var(--color-lime) 40%, transparent) 348deg,
+    transparent 360deg
+  );
+}
+
+/* Pointer spotlight, positioned from the --mx/--my custom properties the scan hook writes
+   outside React (requirement 4.9). The static variant is the reduced-motion form: it jumps to
+   the active node instead of following the pointer, with no transition (§C.4). */
+.field-spotlight {
+  background-image: radial-gradient(
+    circle 108px at var(--mx, 50%) var(--my, 50%),
+    var(--field-spotlight),
+    transparent 70%
+  );
+}
+.field-spotlight-static {
+  background-image: radial-gradient(
+    circle 84px at var(--mx, 50%) var(--my, 50%),
+    var(--field-spotlight),
+    transparent 72%
+  );
+}
+
+/* A distance ring and its mono label (requirement 3.3). */
+.field-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: var(--box-border-sm) dashed color-mix(in srgb, var(--line) 42%, transparent);
+  border-radius: var(--radius-chip);
+}
+
+/* A signal / cluster / ghost node. Positioned by percent, hit area at least 44px (req 1.8). */
+.field-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* The signal drawer: springs up from the bottom of the disc (§C.3 z 30, §I.7). */
+.field-drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-drawer);
+}
+
+/* The anchor marker at the centre of the disc. */
+.youpulse {
+  animation: youpulse 3.2s var(--ease-out-quint) infinite;
+}
+
 /* ============================== texture ============================== */
 
 /* Single fixed grain layer, mounted once at the app root (§I.5). Opacity is surface-aware and */

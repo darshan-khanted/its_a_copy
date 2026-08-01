@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rupees, distanceWords, relativeTime } from './format';
+import { rupees, distanceWords, relativeTime, clockTime, coordinateLine } from './format';
 
 describe('rupees — Indian currency (req 2.4)', () => {
   it('prefixes ₹ and groups en-IN lakhs', () => {
@@ -48,5 +48,30 @@ describe('relativeTime', () => {
     expect(relativeTime(now - 5 * 60000, now)).toBe('5m ago');
     expect(relativeTime(now - 3 * 3600_000, now)).toBe('3h ago');
     expect(relativeTime(now - 2 * 86400_000, now)).toBe('2d ago');
+  });
+});
+
+describe('clockTime — the Field\'s live-ness proof (req 3.9)', () => {
+  it('renders zero-padded local HH:MM:SS', () => {
+    const at = new Date(2026, 0, 4, 9, 5, 7);
+    expect(clockTime(at)).toBe('09:05:07');
+  });
+
+  it('degrades visibly rather than throwing on an invalid date', () => {
+    expect(clockTime(new Date('nope'))).toBe('--:--:--');
+  });
+});
+
+describe('coordinateLine — the Field corner (req 3.9)', () => {
+  it('renders four decimal places with hemisphere letters', () => {
+    expect(coordinateLine(12.91213, 77.64461)).toBe('12.9121° N / 77.6446° E');
+  });
+
+  it('labels southern and western hemispheres', () => {
+    expect(coordinateLine(-33.8688, -70.6693)).toBe('33.8688° S / 70.6693° W');
+  });
+
+  it('returns empty string for non-finite input', () => {
+    expect(coordinateLine(NaN, 77)).toBe('');
   });
 });

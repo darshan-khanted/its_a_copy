@@ -42,6 +42,33 @@ export function distanceWords(distanceM: number): string {
 }
 
 /**
+ * The Field's ticking trust signal: zero-padded local `HH:MM:SS` (design §C.3,
+ * req 3.9). The prototype's clock is a genuinely good honesty cue — it proves the
+ * surface is live — so it is formatted here rather than inline in the component.
+ */
+export function clockTime(at: number | Date = Date.now()): string {
+  const d = at instanceof Date ? at : new Date(at);
+  if (Number.isNaN(d.getTime())) return '--:--:--';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/**
+ * The Field's corner coordinate texture: `12.9121° N / 77.6446° E` (design §C.3,
+ * req 3.9). Four decimal places is ~11 m — coarser than the hood centroid is
+ * meaningful at and far coarser than the fuzz radius, so it is safe to display.
+ * This only ever receives the hood centroid or an opted-in live anchor, never a
+ * gig's exact coordinate (req 20.9).
+ */
+export function coordinateLine(lat: number, lng: number, decimals: number = 4): string {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return '';
+  const dp = Math.max(0, Math.min(6, Math.floor(decimals)));
+  const ns = lat >= 0 ? 'N' : 'S';
+  const ew = lng >= 0 ? 'E' : 'W';
+  return `${Math.abs(lat).toFixed(dp)}° ${ns} / ${Math.abs(lng).toFixed(dp)}° ${ew}`;
+}
+
+/**
  * In-voice relative time. Lowercase, expressive (design §B.5 rule 1).
  */
 export function relativeTime(timestamp: number, now: number = Date.now()): string {

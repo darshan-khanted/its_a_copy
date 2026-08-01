@@ -28,9 +28,17 @@ export const empty = {
     title: 'nothing here at this hour',
     body: 'try the peak hour — that is when your hood actually wakes up.',
   },
+  noMatches: {
+    title: 'nothing matches that',
+    body: 'try fewer words, or clear the search and scan the whole board.',
+  },
   noClaims: {
     title: 'no claims yet',
     body: 'nobody has raised a hand on this flare. give it a minute.',
+  },
+  unknownHood: {
+    title: 'we do not know this hood yet',
+    body: 'claim a pincode and we will put it on the field.',
   },
   preLaunch: {
     title: 'this hood is not live yet',
