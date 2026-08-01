@@ -1,0 +1,160 @@
+/*
+ * THE single design-token source (design §B.1, requirement 1.1).
+ *
+ * Every colour, type, stroke, shadow offset, radius, spacing, motion and z-index value in the
+ * product is declared here as a token. No component may hardcode a colour, stroke width or
+ * shadow offset literal — it consumes these tokens (directly, via the ink utilities in ink.css,
+ * or via Tailwind utilities generated from this @theme block).
+ *
+ * `@theme` emits every token as a CSS custom property on :root AND lets Tailwind generate
+ * matching utilities. The surface-semantic aliases below (--surface-1, --text-1, --line, …) are
+ * ordinary custom properties, NOT @theme tokens, because they are remapped per surface for the
+ * Night Board (design §B.3, requirements 1.6, 1.7).
+ */
+
+@theme {
+  /* ---- surfaces: paper (day) ---- */
+  --color-paper: #efe7d2;
+  --color-paper-2: #e6dcc0;
+  --color-paper-3: #f7f2e4;
+  --color-ink: #0c0b09;
+  --color-ink-soft: #2a2823;
+  --color-ink-mute: #636056;
+
+  /* ---- accents ---- */
+  --color-lime: #c8ff3e;
+  --color-lime-deep: #9ed400;
+  --color-magenta: #ff2e88;
+  --color-magenta-deep: #c4005f; /* magenta as TEXT on paper (§I.1, 4.85:1) */
+  --color-cobalt: #586cff;
+  --color-cobalt-deep: #3b4ddb; /* cobalt as TEXT on paper (§I.1, 5.21:1) */
+  --color-cyan: #38e1ff;
+  --color-peach: #ffb38a;
+
+  /* ---- surfaces: night board (dark), from the Day Zero Pass darks ---- */
+  --color-night: #10111b;
+  --color-night-2: #15141b;
+  --color-night-3: #19172b;
+  --color-night-line: rgba(184, 133, 45, 0.58);
+  --color-gold: #d69e3b;
+  --color-night-text: #f2efe8;
+  --color-night-mute: #d3cddc;
+
+  /* ---- type families (with metric-adjusted fallbacks from fonts.css) ---- */
+  --font-display: "Bricolage Grotesque", "Bricolage Fallback", "DM Sans", system-ui, sans-serif;
+  --font-body: "DM Sans", "DM Sans Fallback", system-ui, sans-serif;
+  --font-mono: "Space Mono", "Space Mono Fallback", ui-monospace, monospace;
+  --font-hand: "Caveat", "Caveat Fallback", cursive;
+
+  /* ---- fluid type scale ---- */
+  --text-hero: clamp(2.75rem, 11vw, 7.5rem);
+  --text-h1: clamp(2rem, 7.5vw, 4.5rem);
+  --text-h2: clamp(1.5rem, 5.5vw, 2.75rem);
+  --text-h3: clamp(1.25rem, 4vw, 1.75rem);
+  --text-price: clamp(1.75rem, 8vw, 3.25rem);
+  --text-body: 1rem;
+  --text-small: 0.8125rem;
+  --text-micro: 0.6875rem;
+  --text-nano: 0.625rem;
+
+  /* ---- border weights (the ink system) ---- */
+  --stroke-sm: 2px;
+  --stroke: 2.5px;
+  --stroke-lg: 3px;
+
+  /* ---- hard shadow offsets ---- */
+  --pop-sm: 4px;
+  --pop: 6px;
+  --pop-lg: 10px;
+  --pop-press: 3px; /* .ink-press hover offset */
+  --pop-active: 1px; /* .ink-press active offset */
+
+  /* ---- radii ---- */
+  --radius-none: 0px;
+  --radius-chip: 999px;
+  --radius-pass: 28px;
+  --radius-soft: 8px;
+
+  /* ---- spacing (4px base, thumb-reach aware) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+  --space-10: 4rem;
+  --tap-min: 44px;
+  --thumb-zone: 168px;
+
+  /* ---- motion ---- */
+  --ease-out-quint: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-press: 80ms;
+  --dur-tilt: 250ms;
+  --dur-drawer: 380ms;
+  --dur-reveal: 700ms;
+  --dur-radar: 9s;
+  --dur-marquee: 38s;
+
+  /* ---- z-index ladder (single source of truth) ---- */
+  --z-field-bg: 0;
+  --z-field-rings: 1;
+  --z-field-radar: 2;
+  --z-field-you: 8;
+  --z-field-nodes: 10;
+  --z-drawer: 30;
+  --z-bottomnav: 40;
+  --z-header: 45;
+  --z-grain: 60;
+  --z-modal: 70;
+  --z-toast: 80;
+  --z-skiplink: 100;
+}
+
+/* ==================== semantic surface aliases: paper (default) ==================== */
+/* These switch wholesale for the Night Board. Components reference the semantic alias */
+/* (var(--text-1), var(--line), …), never the raw palette token, so one attribute flip */
+/* on <html data-surface> restyles the entire product (requirements 1.6, 1.7).         */
+
+:root,
+[data-surface="paper"] {
+  --surface-1: var(--color-paper);
+  --surface-2: var(--color-paper-2);
+  --surface-raised: var(--color-paper-3);
+  --text-1: var(--color-ink);
+  --text-2: var(--color-ink-mute);
+  --line: var(--color-ink);
+  --pop-color: var(--color-ink);
+  --accent-text: var(--color-magenta-deep);
+  --price-text: var(--color-cobalt-deep);
+  --field-spotlight: rgba(200, 255, 62, 0.34);
+  --focus-ring: var(--color-ink);
+  --grain-opacity: 0.16;
+
+  /* ink-box border weights on paper: the full ink strokes */
+  --box-border-sm: var(--stroke-sm);
+  --box-border: var(--stroke);
+  --box-border-lg: var(--stroke-lg);
+}
+
+[data-surface="night"] {
+  --surface-1: var(--color-night);
+  --surface-2: var(--color-night-2);
+  --surface-raised: var(--color-night-3);
+  --text-1: var(--color-night-text);
+  --text-2: var(--color-night-mute);
+  --line: var(--color-night-line);
+  --pop-color: var(--color-gold);
+  --accent-text: var(--color-lime);
+  --price-text: var(--color-lime);
+  --field-spotlight: rgba(200, 255, 62, 0.2);
+  --focus-ring: var(--color-lime);
+  --grain-opacity: 0.09;
+
+  /* On near-black a 2.5px ink border is invisible: hard shadows become a 1px */
+  /* gold-tinted border kept at the same 6px offset (design §B.3).            */
+  --box-border-sm: 1px;
+  --box-border: 1px;
+  --box-border-lg: 1px;
+}

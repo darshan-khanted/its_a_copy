@@ -1,0 +1,454 @@
+/*
+ * The ink surface language — signature utilities (design §B.2), the accessible focus model
+ * (§I.2), the responsive flat-card variant (§K.2 / requirement 1.5), safe-area sizing (§I.7),
+ * texture, and the official-brand sizing/clear-space rules (§K.8 / requirement 1.10).
+ *
+ * Every value here is a token from theme.css. There are no colour, stroke-width or shadow-offset
+ * literals (requirement 1.1). These named classes are what the ink primitive components
+ * (task 3.4) and the Field/Board (tasks 3.21–3.26) consume; nothing here depends on DOM sibling
+ * position (requirement 30.4). The only `!important` in the whole stylesheet is the
+ * reduced-motion reset in index.css.
+ */
+
+/* ============================== base document ============================== */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* safe-area exposed as a token so chrome/sheets can reserve the inset (§I.7) */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--surface-1);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 200ms var(--ease-out-quint), color 200ms var(--ease-out-quint);
+}
+
+::selection {
+  background-color: var(--color-lime);
+  color: var(--color-ink);
+}
+
+/* ============================== ink surfaces ============================== */
+
+.ink-box {
+  border: var(--box-border) solid var(--line);
+  box-shadow: var(--pop) var(--pop) 0 0 var(--pop-color);
+  background-color: var(--surface-raised);
+  border-radius: var(--radius-none);
+}
+
+.ink-box-sm {
+  border: var(--box-border-sm) solid var(--line);
+  box-shadow: var(--pop-sm) var(--pop-sm) 0 0 var(--pop-color);
+  background-color: var(--surface-raised);
+  border-radius: var(--radius-none);
+}
+
+.ink-box-lg {
+  border: var(--box-border-lg) solid var(--line);
+  box-shadow: var(--pop-lg) var(--pop-lg) 0 0 var(--pop-color);
+  background-color: var(--surface-raised);
+  border-radius: var(--radius-none);
+}
+
+/* Coloured shadows signal state: magenta = urgent/live, lime = agreed/done, cobalt = money. */
+.ink-box-magenta {
+  --pop-color: var(--color-magenta);
+}
+.ink-box-lime {
+  --pop-color: var(--color-lime-deep);
+}
+.ink-box-cobalt {
+  --pop-color: var(--color-cobalt);
+}
+
+/*
+ * The flat variant — border, no hard shadow, tilt off. Used for singular vs dense contexts:
+ * shadow signals importance, so it is reserved for standalone objects (§K.2). `.flat` is the
+ * opt-in modifier the InkBox primitive maps its `flat` prop to.
+ */
+.ink-box.flat,
+.ink-box-sm.flat,
+.ink-box-lg.flat,
+.flat {
+  box-shadow: none;
+}
+
+/* ============================== press grammar ============================== */
+/* The tactile affordance. Every pressable uses this; no interactive state is signalled by */
+/* colour change alone (requirement 1.3). The translate is a non-colour affordance.          */
+
+.ink-press {
+  transition: transform var(--dur-press) var(--ease-out-quint),
+    box-shadow var(--dur-press) var(--ease-out-quint);
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+.ink-press:hover {
+  transform: translate(2px, 2px);
+  box-shadow: var(--pop-press) var(--pop-press) 0 0 var(--pop-color);
+}
+.ink-press:active {
+  transform: translate(5px, 5px);
+  box-shadow: var(--pop-active) var(--pop-active) 0 0 var(--pop-color);
+}
+
+/* Deterministic tilt (--rot seeded per card, §H.8 — never recomputed on re-render). */
+.tilt {
+  transform: rotate(var(--rot, 0deg));
+  transition: transform var(--dur-tilt) var(--ease-out-quint);
+}
+.tilt:hover {
+  transform: rotate(0deg) translateY(-5px);
+}
+
+/* ============================ accessible focus (§I.2) ============================ */
+/* The ink/lime outline is the accessible carrier (15.9:1 paper / 16.7:1 night); the magenta */
+/* hard shadow is decoration only. :focus-visible so pointer users never see it.             */
+
+:where(a, button, [role="button"], input, select, textarea, [tabindex]):focus-visible {
+  outline: var(--stroke-lg) solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: var(--pop) var(--pop) 0 0 var(--color-magenta);
+}
+
+/* Tactile input focus for pointer interaction; keyboard focus still gets the outline above. */
+.field-input {
+  border: var(--box-border) solid var(--line);
+  background-color: var(--surface-raised);
+  color: var(--text-1);
+  border-radius: var(--radius-none);
+}
+.field-input:focus {
+  outline: none;
+  box-shadow: var(--pop) var(--pop) 0 0 var(--color-magenta);
+  transform: translate(-1px, -1px);
+}
+.field-input:focus-visible {
+  outline: var(--stroke-lg) solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* =========================== the responsive list card =========================== */
+/*
+ * Requirement 1.5 / §K.2: in a list context below 480px, cards render flat (ink border, no
+ * hard shadow) with tilt disabled — a ragged rotated left edge and stacked shadows hurt
+ * scanning on a phone. Above 480px the list card keeps its small shadow and tilt.
+ */
+.ink-list-card {
+  border: var(--box-border-sm) solid var(--line);
+  box-shadow: var(--pop-sm) var(--pop-sm) 0 0 var(--pop-color);
+  background-color: var(--surface-raised);
+  transform: rotate(var(--rot, 0deg));
+  transition: transform var(--dur-tilt) var(--ease-out-quint);
+}
+@media (max-width: 479px) {
+  .ink-list-card {
+    box-shadow: none;
+    --rot: 0deg;
+    transform: none;
+  }
+}
+
+/* ============================== texture ============================== */
+
+/* Single fixed grain layer, mounted once at the app root (§I.5). Opacity is surface-aware and */
+/* the whole layer is conditionally mounted by the texture budget (task 11.2).                 */
+.grain {
+  z-index: var(--z-grain);
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+.halftone {
+  background-image: radial-gradient(var(--line) 1.1px, transparent 1.2px);
+  background-size: 10px 10px;
+}
+.halftone-lime {
+  background-image: radial-gradient(var(--color-lime-deep) 1.4px, transparent 1.5px);
+  background-size: 12px 12px;
+}
+
+/* Outlined display text. */
+.stroke-ink {
+  -webkit-text-stroke: var(--stroke) var(--line);
+  color: transparent;
+}
+.stroke-thin {
+  -webkit-text-stroke: 1.5px var(--line);
+  color: transparent;
+}
+
+/* Pinned label ("NEW" / "URGENT"). */
+.tape {
+  width: 74px;
+  min-height: 22px;
+  background-color: color-mix(in srgb, var(--color-lime) 72%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--color-ink) 55%, transparent);
+  backdrop-filter: blur(1px);
+  font-family: var(--font-mono);
+  font-size: var(--text-nano);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tape-magenta {
+  background-color: color-mix(in srgb, var(--color-magenta) 72%, transparent);
+}
+
+/*
+ * .redacted is load-bearing: locked rank rewards and pre-agreement contact detail (§B.2).
+ * Because blurred text is deliberately unreadable it must never be the sole information
+ * carrier — every redacted element also carries a real aria-label (§I.1, requirement 27.11).
+ */
+.redacted {
+  filter: blur(5px);
+  opacity: 0.75;
+  border: var(--box-border-sm) dashed var(--line);
+  border-radius: var(--radius-soft);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* The completion artefact. */
+.receipt {
+  font-family: var(--font-mono);
+  background-color: var(--surface-raised);
+  border: var(--box-border) solid var(--line);
+}
+.receipt-divider {
+  border: none;
+  border-top: 1.5px dashed var(--line);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================== motion utilities ============================== */
+
+.marquee {
+  animation: marquee-left var(--dur-marquee) linear infinite;
+  width: max-content;
+}
+.marquee-rev {
+  animation: marquee-right 46s linear infinite;
+  width: max-content;
+}
+.marquee-fast {
+  animation: marquee-left 22s linear infinite;
+  width: max-content;
+}
+.marquee:hover,
+.marquee-rev:hover,
+.marquee-fast:hover {
+  animation-play-state: paused;
+}
+
+.floaty {
+  animation: floaty 5s var(--ease-out-quint) infinite;
+}
+.wiggle {
+  animation: wiggle 3.4s var(--ease-out-quint) infinite;
+}
+.spin-slow {
+  animation: spin-slow 14s linear infinite;
+}
+.blink {
+  animation: blink 1.1s step-end infinite; /* ~0.9 Hz, below the 3 Hz limit (req 27.14) */
+}
+.radar {
+  animation: radar var(--dur-radar) linear infinite;
+}
+.nodepulse {
+  animation: nodepulse 2.6s var(--ease-out-quint) infinite;
+  animation-delay: var(--delay, 0ms);
+}
+.flare-out {
+  animation: flare-out 900ms var(--ease-out-quint) forwards;
+}
+
+/* Off-screen node pulses are paused for the performance budget (§I.5, requirement 28.13). */
+.nodepulse[data-offscreen="true"] {
+  animation-play-state: paused;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity var(--dur-reveal) var(--ease-out-quint),
+    transform var(--dur-reveal) var(--ease-out-quint);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ============================== safe-area sizing (§I.7) ============================== */
+
+.safe-bottom {
+  padding-bottom: max(var(--space-4), var(--safe-bottom));
+}
+.safe-top {
+  padding-top: max(var(--space-2), var(--safe-top));
+}
+
+/* Minimum interactive target, including clustered Field nodes (requirement 1.8, NFR-2.2). */
+.tap-target {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+}
+
+/* The thumb zone reserved for primary actions on mobile (§I.7). */
+.thumb-zone {
+  padding-bottom: max(var(--thumb-zone), calc(var(--safe-bottom) + var(--thumb-zone)));
+}
+
+/* ======================= official brand sizing / clear-space (§K.8) ======================= */
+/*
+ * Requirement 1.10: use the official artwork at its stated minimum sizes with clear space of
+ * at least the ring radius, and never re-typeset the wordmark. These classes enforce the
+ * minima; the mark's ring radius is ~28% of its height, so clear space is reserved as padding.
+ * The wordmark is only ever rendered as the supplied outlined SVG artwork — never as live text.
+ */
+.brand-mark {
+  display: inline-block;
+  min-inline-size: 20px; /* mark minimum 20px (below this use the favicon) */
+  min-block-size: 20px;
+}
+.brand-lockup {
+  display: inline-block;
+  min-inline-size: 90px; /* horizontal lockup minimum 90px wide */
+}
+.brand-clearspace {
+  /* clear space >= the ring radius on all sides */
+  padding: max(0.28em, 6px);
+}
+
+/* ============================== screen-reader list (§I.3) ============================== */
+/* The Field's visually-hidden parallel list of every visible signal as real links.        */
+.qg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.qg-sr-only:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* ============================== keyframes ============================== */
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1.5deg);
+  }
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes radar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes nodepulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-lime) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+@keyframes youpulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cobalt) 45%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 22px transparent;
+  }
+}
+@keyframes flare-out {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}

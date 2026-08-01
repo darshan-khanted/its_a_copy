@@ -1,0 +1,44 @@
+@import "tailwindcss";
+@import "./fonts.css";
+@import "./theme.css";
+@import "./ink.css";
+
+/*
+ * Stylesheet entry (Phase 1, task 3.3).
+ *
+ * The generated positional CSS shipped by the AI Studio export was removed in full in Phase 0
+ * (task 1.4): every `div#root ... > div:nth-of-type(n) > ...` sibling-position selector and every
+ * obsolete indigo override with its `!important` declarations (requirements 30.4, 31.10; §A.4.2).
+ *
+ * On top of the Tailwind import this entry now composes the design system:
+ *   - fonts.css   — self-hosted subset variable fonts + metric-adjusted fallbacks (§I.4)
+ *   - theme.css   — THE single `@theme` token source + surface-semantic aliases (§B.1, §B.3)
+ *   - ink.css     — the ink utilities, focus model, flat variant, safe-area, brand rules (§B.2, §I)
+ *
+ * The reduced-motion reset below is the ONLY place an `!important` declaration is permitted
+ * anywhere in the stylesheet (requirement 30.4, §A.4.2 / §B.2). It disables the decorative motion
+ * utilities for motion-sensitive users while preserving every outcome and all information — only
+ * timing changes (NFR-2.4, requirement 27.12/27.13). Reveals snap to their final state.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .marquee,
+  .marquee-rev,
+  .marquee-fast,
+  .floaty,
+  .wiggle,
+  .spin-slow,
+  .blink,
+  .radar,
+  .nodepulse,
+  .flare-out {
+    animation: none !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+  .ink-press,
+  .tilt {
+    transition-duration: 1ms;
+  }
+}

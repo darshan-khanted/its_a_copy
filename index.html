@@ -2,8 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Qwick Gig</title>
+    <!-- Preload the display + body families only (<= 64 KB), self-hosted; never the Google CDN
+         (requirements 28.4, 28.7). Space Mono is not preloaded; Caveat loads lazily (§I.4). -->
+    <link rel="preload" href="/fonts/bricolage.subset.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/dmsans.subset.woff2" as="font" type="font/woff2" crossorigin />
     <script>
       (function() {
         try {
@@ -20,7 +24,7 @@
       })();
     </script>
   </head>
-  <body class="bg-[#F8FAFC] text-[#0F172A] antialiased selection:bg-[#D1FAE5] selection:text-[#059669]">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

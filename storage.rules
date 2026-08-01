@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// ============================================================================
+// Qwick Gig — Cloud Storage security rules (default-deny baseline)
+// Task 1.5 (Phase 0). Companion to firestore.rules.
+//
+// Contracts: design §G.7 (upload route), §G.4/§G.6 (private KYC); requirements
+// 21.8, 21.9; NFR-3.1, NFR-3.6.
+//
+// Trust model: all uploads flow through the authenticated server route
+// (POST /api/upload) using the Firebase Admin SDK, which bypasses these rules.
+// Clients therefore never write to Storage. Display assets (avatars, gig
+// photos) are publicly readable so their download URLs render in <img>; identity
+// documents (KYC) are unreachable by any client, satisfying req 21.9 / NFR-3.6.
+//
+// Upload paths mirror server/routes/uploads.ts: uploads/{type}s/... where
+// type ∈ { avatar, gig, aadhar }.
+// ============================================================================
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public display assets — readable by anyone, written server-side only.
+    match /uploads/avatars/{file=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /uploads/gigs/{file=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Identity documents (KYC / aadhaar): no client read or write, ever.
+    // Stored under the user's private KYC record and deleted after approval,
+    // retaining only an approval flag, timestamp, and last-four hash (req 21.9).
+    match /uploads/aadhars/{file=**} {
+      allow read, write: if false;
+    }
+
+    // Global safety net — deny every path not explicitly allowed (NFR-3.1).
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,8 +1,319 @@
 rules_version = '2';
+
+// ============================================================================
+// Qwick Gig — Firestore security rules (default-deny baseline)
+// Task 1.5 (Phase 0). Replaces the previous `allow read, write: if true`.
+//
+// Contracts: design §G.4 (data model), §G.5 (collections), §G.6 (rule deltas),
+// §J.3 (privacy invariants); requirements 12.15, 15.2, 21.5-21.9; NFR-3.1/2/3/6.
+//
+// Trust model: every server-owned collection and field is written ONLY by the
+// trusted backend using the Firebase Admin SDK (which bypasses these rules).
+// From a client these paths are default-deny. Progression state (rep, rank,
+// verification), Handshake transitions, fuzzed geo, private KYC, reports,
+// notifications, waitlist, rate-limit counters and the rep ledger are therefore
+// server-authoritative and non-forgeable.
+// ============================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // Reusable helpers (§G.6 — auth, ownership, id-guard, immutable-field,
+    // participant, and server-only building blocks).
+    // ------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // UID-keyed ownership (users are keyed by Firebase uid after migration, §G.8).
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Bounded, charset-safe document id guard (kept from DRAFT, 128-char cap).
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.\\@]+$');
+    }
+
+    // True when a client write leaves every field in `fields` untouched.
+    function unchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // True when a client write touches ONLY fields in the allowlist.
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // Parent-document lookups (used for private-subdoc and review authorization).
+    function gigOf(gigId) {
+      return get(/databases/$(database)/documents/gigs/$(gigId)).data;
+    }
+    function handshakeOf(hid) {
+      return get(/databases/$(database)/documents/handshakes/$(hid)).data;
+    }
+
+    // A gig's private location/contact are readable only by the poster or by the
+    // doer of that gig's AGREED handshake (§G.6.5, §J.3 P3.4/P3.5, req 21.1-21.3).
+    function canReadGigPrivate(gigId) {
+      return isSignedIn() && (
+        gigOf(gigId).posterUid == request.auth.uid ||
+        (gigOf(gigId).get('agreedHandshakeId', null) != null &&
+         handshakeOf(gigOf(gigId).agreedHandshakeId).doerUid == request.auth.uid)
+      );
+    }
+
+    // Requester is a participant of a SETTLED handshake (review-integrity, §G.6.7).
+    function isSettledParticipant(hid) {
+      return exists(/databases/$(database)/documents/handshakes/$(hid)) &&
+        handshakeOf(hid).state == 'SETTLED' && (
+          handshakeOf(hid).posterUid == request.auth.uid ||
+          handshakeOf(hid).doerUid == request.auth.uid
+        );
+    }
+
+    // Server-owned fields on the public gig doc (§G.6.3, req 21.7). Immutable to
+    // clients; the allowlisted update path below also structurally excludes them.
+    function gigServerFields() {
+      return [
+        'state', 'agreedHandshakeId', 'claimCount', 'visibleFrom',
+        'geoFuzzed', 'geohash7', 'fuzzSeedVersion', 'posterSnapshot',
+        'posterUid', 'hoodId', 'minRank', 'createdAt', 'schemaVersion'
+      ];
+    }
+
+    // Fields a poster may edit on an OPEN gig (§G.6.2, req 21.6).
+    function gigEditableFields() {
+      return [
+        'title', 'body', 'askPrice', 'tags', 'urgent',
+        'startDate', 'startTime', 'startHour', 'expiresAt', 'photoUrl'
+      ];
+    }
+
+    // Progression / verification fields a client may never write (§G.6.3,
+    // §D.4, req 15.2). Nested keys (e.g. verification.status) are protected by
+    // locking the whole `verification` object.
+    function userServerFields() {
+      return [
+        'rep', 'repVersion', 'heat', 'rank', 'distinctCounterparties',
+        'upheldReports', 'streakWeeks', 'verified', 'verification', 'dayZero',
+        'gigsSettled', 'rating', 'ratingCount', 'uid', 'createdAt', 'schemaVersion'
+      ];
+    }
+
+    // ==================================================================
+    // hoods/{pincode} — public read, server-written cache + stats (§G.5)
+    // ==================================================================
+    match /hoods/{pincode} {
+      allow read: if true;              // public browsing before auth (req 8.9, 23.1)
+      allow write: if false;            // resolved/cached server-side only
+    }
+
+    // ==================================================================
+    // gigs/{gigId} — public read; poster create + limited update; server owns
+    // state/geo/counters (§G.5, §G.6.2/3, req 21.5-21.7)
+    // ==================================================================
+    match /gigs/{gigId} {
+      allow read: if true;              // fuzzed public signal (req 23.1)
+
+      // Poster creates their own signal; server-owned fields must not be forged
+      // to privileged values at creation time.
+      allow create: if isSignedIn()
+        && isValidId(gigId)
+        && request.resource.data.posterUid == request.auth.uid
+        && request.resource.data.get('state', 'OPEN') == 'OPEN'
+        && request.resource.data.get('agreedHandshakeId', null) == null
+        && request.resource.data.get('claimCount', 0) == 0;
+
+      // Poster may edit ONLY the allowlisted content fields, and only while OPEN.
+      // hasOnly(...) structurally forbids writes to every server-owned field.
+      allow update: if isSignedIn()
+        && resource.data.posterUid == request.auth.uid
+        && resource.data.state == 'OPEN'
+        && onlyChanges(gigEditableFields())
+        && unchanged(gigServerFields());
+
+      allow delete: if isSignedIn() && resource.data.posterUid == request.auth.uid;
+
+      // Exact coordinates — poster + agreed doer read; server write only.
+      match /private/location {
+        allow read: if canReadGigPrivate(gigId);
+        allow write: if false;
+      }
+
+      // Contact details — tightened from DRAFT's isSignedIn() to participants.
+      match /private/contact {
+        allow read: if canReadGigPrivate(gigId);
+        allow write: if false;
+      }
+
+      // Any other private subdoc: default deny.
+      match /private/{doc} {
+        allow read, write: if false;
+      }
+    }
+
+    // ==================================================================
+    // handshakes/{id} — participants read; ALL client writes denied so every
+    // transition passes through the server endpoints (req 12.15, NFR-3.3)
+    // ==================================================================
+    match /handshakes/{handshakeId} {
+      allow read: if isSignedIn() && (
+        resource.data.posterUid == request.auth.uid ||
+        resource.data.doerUid == request.auth.uid
+      );
+      allow write: if false;
+    }
+
+    // ==================================================================
+    // chats/{threadId} — participant-scoped (kept, now UID-based, §G.5)
+    // ==================================================================
+    match /chats/{threadId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.participants;
+      allow update, delete: if isSignedIn()
+        && request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(threadId)).data.participants;
+        // Author may only write their own messages.
+        allow create: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(threadId)).data.participants
+          && request.resource.data.get('senderUid', request.auth.uid) == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // ==================================================================
+    // users/{uid} — public identity read; owner may edit profile fields only;
+    // rep/rank/verification are server-only (§G.5, §G.6.3, req 15.2)
+    // ==================================================================
+    match /users/{userId} {
+      allow read: if isSignedIn();
+
+      // A new account may not self-grant progression or verification.
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && request.resource.data.get('verified', false) == false
+        && request.resource.data.get('rep', 0) == 0
+        && request.resource.data.get('verification', {'status': 'none'}).status == 'none';
+
+      // Profile edits only; every server-owned field must be unchanged.
+      allow update: if isOwner(userId) && unchanged(userServerFields());
+
+      allow delete: if isOwner(userId);
+
+      // Owner-managed private contact (email, phone, phoneHash).
+      match /private/contact {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Payment handle (VPA). Owner manages; cross-party reveal is done via the
+      // server reveal endpoint, so no client cross-read is granted here.
+      match /private/payment {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Identity documents (KYC). All client access denied (req 21.9, NFR-3.6);
+      // stored, deleted-after-approval, and read only by the server.
+      match /private/kyc {
+        allow read, write: if false;
+      }
+
+      // Any other private subdoc: default deny.
+      match /private/{doc} {
+        allow read, write: if false;
+      }
+    }
+
+    // ==================================================================
+    // phoneIndex/{phoneHash} — real phone uniqueness; server create-once (§G.4)
+    // ==================================================================
+    match /phoneIndex/{phoneHash} {
+      allow read, write: if false;
+    }
+
+    // ==================================================================
+    // repEvents/{id} — immutable rep ledger; owner read, server write (req 15.2)
+    // ==================================================================
+    match /repEvents/{eventId} {
+      allow read: if isSignedIn() && resource.data.get('uid', '') == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ==================================================================
+    // reviews/{handshakeId}_{reviewerUid} — public after release; author
+    // create-once, immutable thereafter (§G.6.7)
+    // ==================================================================
+    match /reviews/{reviewId} {
+      allow read: if resource.data.get('releasedAt', null) != null
+        || (isSignedIn() && resource.data.get('reviewerUid', '') == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isValidId(reviewId)
+        && request.resource.data.reviewerUid == request.auth.uid
+        && request.resource.data.targetUid != request.auth.uid
+        && isSettledParticipant(request.resource.data.handshakeId);
+
+      allow update, delete: if false;   // immutable; release is server-side
+    }
+
+    // ==================================================================
+    // reports/{id} — authed create; client reads denied (req 22.2, NFR-3)
+    // ==================================================================
+    match /reports/{reportId} {
+      allow read: if false;             // server/moderator only
+      allow create: if isSignedIn()
+        && request.resource.data.get('reporterUid', request.auth.uid) == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ==================================================================
+    // waitlist/{emailHash} — server/landing-page owned, Day Zero matching (§G.5)
+    // ==================================================================
+    match /waitlist/{emailHash} {
+      allow read, write: if false;
+    }
+
+    // ==================================================================
+    // notifications/{kind}_{subjectId}_{uid} — owner read; server write (§E.8)
+    // ==================================================================
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.get('uid', '') == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ==================================================================
+    // writeCounters/{uid}_{yyyymmddhh} — server-side rate limiting (§G.6.8)
+    // ==================================================================
+    match /writeCounters/{counterId} {
+      allow read, write: if false;
+    }
+
+    // ==================================================================
+    // password_resets/{id} — fully server-owned (kept from DRAFT)
+    // ==================================================================
+    match /password_resets/{resetId} {
+      allow read, write: if false;
+    }
+
+    // ==================================================================
+    // activities_* — server-written trace/audit logs; no client access.
+    // ==================================================================
+    match /activities_general/{id} { allow read, write: if false; }
+    match /activities_auth/{id}    { allow read, write: if false; }
+    match /activities_gigs/{id}    { allow read, write: if false; }
+    match /activities_users/{id}   { allow read, write: if false; }
+    match /activities_admin/{id}   { allow read, write: if false; }
+
+    // ==================================================================
+    // Global safety net — everything not explicitly allowed is denied
+    // (req 21.8, NFR-3.1).
+    // ==================================================================
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

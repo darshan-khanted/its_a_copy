@@ -1,0 +1,790 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Establish the TypeScript project and automated-test foundation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078895
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304088367
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304369489
+      }
+    ],
+    "1.2 Move the flattened application into the approved `src/` feature structure": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078902
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304373667
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305336533
+      }
+    ],
+    "1.3 Split the Express entry point and remove authentication bypasses": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078906
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304374366
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305338214
+      }
+    ],
+    "1.4 Replace generated positional CSS with stable named styles": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078912
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305343854
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305808939
+      }
+    ],
+    "1.5 Deploy the default-deny Firestore and Storage rule baseline": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078917
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305345085
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305810378
+      }
+    ],
+    "1.6 Declare every required Firestore composite index": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078926
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305346107
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305811207
+      }
+    ],
+    "1.7 Build the versioned migration harness and compatibility layer": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078936
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305347433
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305812158
+      }
+    ],
+    "1.9 Add build, type-check, and bundle verification to CI": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078945
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785305816860
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306069452
+      }
+    ],
+    "2. Checkpoint — secure, buildable baseline": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078961
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306088773
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306091366
+      }
+    ],
+    "3.1 Implement shared deterministic, formatting, and typed-copy modules": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078968
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306592572
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307375999
+      }
+    ],
+    "3.3 Create the tokenized paper/night design-system styles and self-hosted fonts": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078973
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306593452
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307376300
+      }
+    ],
+    "3.4 Implement pure ink primitives, deterministic avatars, and state components": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078978
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307386328
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308167996
+      }
+    ],
+    "3.5 Replace view-state navigation with the addressable router and app chrome": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078982
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306594853
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307377626
+      }
+    ],
+    "3.6 Implement the server-authoritative Hood service and hood-scoped data hooks": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078987
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306595624
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307378532
+      }
+    ],
+    "3.7 Build hood claim, switcher, pre-launch, and flag-planting experiences": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078993
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307387780
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308169437
+      }
+    ],
+    "3.8 Implement the pure geo-to-Field projection module": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304078999
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307388805
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308170511
+      }
+    ],
+    "3.15 Implement the spatial hash, rAF scheduler, and multimodal Scan hook": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079005
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307390083
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308171903
+      }
+    ],
+    "3.21 Build the live Field surface from real hood data": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079011
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310797101
+      }
+    ],
+    "3.22 Implement Field clustering, collision control, and the 60-node budget": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079018
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310798471
+      }
+    ],
+    "3.23 Add complete Field touch, keyboard, and screen-reader presentation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079023
+      }
+    ],
+    "3.24 Implement honest zero-supply and sparse-board derivation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079027
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310799760
+      }
+    ],
+    "3.26 Build the first-class Board, mode toggle, filters, sorting, and search": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079032
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310800467
+      }
+    ],
+    "4. Checkpoint — Field and hood marketplace foundation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079036
+      }
+    ],
+    "5.1 Build the three-beat flare composer and authoritative creation endpoint": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079041
+      }
+    ],
+    "5.2 Implement immediate identity-verification access and preserved-action orchestration": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079046
+      }
+    ],
+    "5.5 Implement idempotent atomic claim creation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079052
+      }
+    ],
+    "5.6 Build claim ritual and poster candidate-comparison surfaces": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079057
+      }
+    ],
+    "5.7 Implement the pure Handshake reducer and offer model": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079063
+      }
+    ],
+    "5.14 Implement server-authoritative Handshake transitions and single-winner acceptance": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079068
+      }
+    ],
+    "5.16 Build the Handshake/thread UI and migrate legacy claims": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079073
+      }
+    ],
+    "6. Checkpoint — identity-gated claim and Handshake core": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079078
+      }
+    ],
+    "7.1 Define immutable rep, rank, unlock, review-freeze, and visibility contracts": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079082
+      }
+    ],
+    "7.2 Implement server-only grant, idempotency, ledger recompute, and rank evaluation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079087
+      }
+    ],
+    "7.3 Implement pending grants, rolling caps, review freezes, and FIFO release applications": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079093
+      }
+    ],
+    "7.4 Implement rank-derived access, visibility, and hood rank-gate caps": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079098
+      }
+    ],
+    "7.5 Build rep ledger, rank track, redacted rewards, and reveal surfaces": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079103
+      }
+    ],
+    "7.6 Implement honest ratings, identity cards, Day Zero Pass, handles, and profiles": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079108
+      }
+    ],
+    "7.7 Extend migrations for ratings, rep replay, and progression state": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079113
+      }
+    ],
+    "8. Checkpoint — auditable progression and real unlocks": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079117
+      }
+    ],
+    "9.1 Implement server-side location fuzzing and migrate exact coordinates": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079122
+      }
+    ],
+    "9.2 Enforce private contact/location/payment access and state-aware reveal": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079127
+      }
+    ],
+    "9.9 Implement double-blind reviews and the non-blocking Loop Flow": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079131
+      }
+    ],
+    "9.10 Implement reporting, blocking, disputes, and moderation consequences": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079136
+      }
+    ],
+    "9.11 Build live-gig coordination and first-pair safety experiences": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079142
+      }
+    ],
+    "9.12 Build the receipt and client-only UPI handoff": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079148
+      }
+    ],
+    "9.13 Implement payment attestations and mismatch disputes": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079154
+      }
+    ],
+    "9.14 Implement Hood Council moderation access": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079159
+      }
+    ],
+    "9.15 Harden identity-document lifecycle and write rate limits": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079164
+      }
+    ],
+    "10. Checkpoint — trust, reviews, safety, and direct-payment invariants": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079172
+      }
+    ],
+    "11.1 Implement automatic and manual Night Board surfaces": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079177
+      }
+    ],
+    "11.2 Implement reduced-motion orchestration and device texture budgets": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079181
+      }
+    ],
+    "11.5 Implement pure day-rhythm aggregation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079186
+      }
+    ],
+    "11.6 Build the URL-driven day-rhythm scrubber and no-result jump": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079193
+      }
+    ],
+    "11.11 Implement deterministic notifications, batching, cadence, and hood-launch emission": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079198
+      }
+    ],
+    "11.12 Build alerts, rank/Handshake notification UX, and deep-link handling": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079202
+      }
+    ],
+    "11.17 Finish progression capabilities and marketplace polish": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079207
+      }
+    ],
+    "11.18 Implement offline drafts, queued idempotent flare publication, and degraded states": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079214
+      }
+    ],
+    "11.19 Complete automated accessibility behavior across all flows": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079218
+      }
+    ],
+    "11.20 Enforce production performance and payload budgets": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079222
+      }
+    ],
+    "12. Final checkpoint — complete implementation plan validation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785304079227
+      }
+    ],
+    "1. Phase 0 — unbreak the build, secure data, and clean up authentication": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306069458
+      }
+    ],
+    "1.8 Write migration-harness and compatibility tests": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306131663
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306584432
+      }
+    ],
+    "1.10 Write baseline security-rule regression tests": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306132501
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785306585270
+      }
+    ],
+    "3.2 Write property test P9.3 for deterministic tilt": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785307391014
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308174029
+      }
+    ],
+    "3.9 Write property test P4.1 for projection round trips": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308186451
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308432802
+      }
+    ],
+    "3.10 Write property test P4.2 for projection bounds": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308187314
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308433831
+      }
+    ],
+    "3.11 Write property test P4.3 for anchor centering": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308188715
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308435267
+      }
+    ],
+    "3.12 Write property test P4.4 for radial ordering": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308189750
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308436090
+      }
+    ],
+    "3.13 Write property test P4.5 for bearing preservation": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308190694
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308437129
+      }
+    ],
+    "3.14 Write property test P4.6 for out-of-range clamping": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308438559
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310615655
+      }
+    ],
+    "3.16 Write property test P5.1 for Scan determinism": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308439391
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310616474
+      }
+    ],
+    "3.17 Write property test P5.2 against exhaustive search": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308440825
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310617914
+      }
+    ],
+    "3.18 Write property test P5.3 for search-radius safety": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308441860
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310618949
+      }
+    ],
+    "3.19 Write property test P5.4 for stable tie-breaking": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785308442814
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310620374
+      }
+    ],
+    "3.20 Write property test P5.5 for frame throttling": [
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310621062
+      },
+      {
+        "executionId": "21347cd3-46e0-4985-bae6-ca1f6ce7b272",
+        "chatSessionId": "d1632fef-0ac5-422f-bd46-691dcd37f593",
+        "timestamp": 1785310790919
+      }
+    ]
+  }
+}
