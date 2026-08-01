@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { PhaseScreen } from '@/components/PhaseScreen';
 import { ModalRoute } from '@/components/layout/ModalRoute';
 import { ClaimHood } from '@/features/hood/ClaimHood';
+import { HandshakeDetail } from '@/features/handshake/HandshakeDetail';
 import { FieldScreen } from '@/features/field/components/FieldScreen';
 import { BoardScreen } from '@/features/gigs/BoardScreen';
 import { SignalDetail } from '@/features/gigs/SignalDetail';
@@ -62,10 +63,7 @@ export function AppRoutes() {
           />
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/t/:threadId" element={<Thread />} />
-          <Route
-            path="/handshake/:id"
-            element={<PhaseScreen title="handshake" note="agreement detail arrives in phase 2." />}
-          />
+          <Route path="/h/:handshakeId" element={<HandshakeDetail />} />
           <Route
             path="/live/:handshakeId"
             element={<PhaseScreen title="live gig" note="the live runner arrives in phase 4." />}
