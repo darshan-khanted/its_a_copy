@@ -210,7 +210,7 @@ Implement the redesign incrementally in TypeScript on the approved React 18 + Vi
     - **Property P2.9: Preserved claims resume only when every eligibility gate still passes**
     - **Validates: Requirements 11.12**
 
-  - [ ] 5.5 Implement idempotent atomic claim creation
+  - [x] 5.5 Implement idempotent atomic claim creation
     - Validate identity, one-liner length, ₹25 pricing, availability, counter-offer status, rank floor, and active-claim limit.
     - Atomically create deterministic Handshake and thread IDs, pinned Handshake card, first human message, and one claim-count increment; make retries return existing artifacts unchanged.
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.10, 11.11, 11.12, 11.13_
